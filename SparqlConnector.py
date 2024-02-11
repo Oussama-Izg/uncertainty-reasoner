@@ -2,11 +2,15 @@ import requests
 import io
 import pandas as pd
 from abc import ABC, abstractmethod
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SparqlBaseConnector(ABC):
-    def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None, certainty_predicate="ex:certaintyValue",
-                 model_predicate="ex:accordingTo"):
+    def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None,
+                 certainty_predicate="ex:certaintyValue",
+                 model_predicate="ex:accordingTo", concept_predicate="rdf:type"):
         if prefixes is None:
             prefixes = {}
 
@@ -23,6 +27,7 @@ class SparqlBaseConnector(ABC):
         self.prefixes = prefixes
         self.certainty_predicate = certainty_predicate
         self.model_predicate = model_predicate
+        self.concept_predicate = concept_predicate
 
     def read_query(self, query):
         headers = {
@@ -31,7 +36,7 @@ class SparqlBaseConnector(ABC):
         data = {
             'query': query
         }
-        response = requests.get(self.query_endpoint, data=data, headers=headers)
+        response = requests.post(self.query_endpoint, data=data, headers=headers)
         return pd.read_csv(io.StringIO(response.text))
 
     def delete_query(self, query=None, delete_all=False):
@@ -74,15 +79,19 @@ class ReificationSparqlConnector(SparqlBaseConnector):
                 query += f"PREFIX {prefix}: <{self.prefixes.get(prefix)}> \n"
             query += f"""
             SELECT ?s ?p ?o ?certainty ?model WHERE {{
-                _:1 rdf:subject ?s .
-                _:1 rdf:predicate ?p .
-                _:1 rdf:object ?o .
-                OPTIONAL {{_:1 {self.certainty_predicate} ?certainty}} .
-                OPTIONAL {{_:1 {self.model_predicate} ?model}} .
+                {{?b rdf:subject ?s .
+                ?b rdf:predicate ?p .
+                ?b rdf:object ?o .
+                ?b {self.certainty_predicate} ?certainty .
+                OPTIONAL {{?b {self.model_predicate} ?model}} .}} UNION {{
+                    ?s ?p ?o .
+                    FIlTER (!ISBLANK(?s))
+                }}
             }}"""
-        self.read_query(query)
+        return self.read_query(query)
 
     def upload_df(self, df):
+        """
         turtle_data = ""
         for prefix in self.prefixes:
             turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
@@ -93,6 +102,31 @@ class ReificationSparqlConnector(SparqlBaseConnector):
             turtle_data += f"_:{counter} rdf:object {row['o']} . \n"
             turtle_data += f"_:{counter} {self.certainty_predicate} \"{row['certainty']}\"^^xsd:decimal . \n"
             counter += 1
+        with open('text.txt', 'w') as f:
+            f.write(turtle_data)
+        self.upload_turtle(turtle_data)"""
+        turtle_data = ""
+        for prefix in self.prefixes:
+            turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
+
+        mask = (df['certainty'] == 1) & (df['model'].isna())
+        df['certain_triple'] = ""
+        df.loc[mask, 'certain_triple'] = df['s'] + " " + df['p'] + " " + df['o'] + " . \n"
+        turtle_data += df['certain_triple'].str.cat(sep="")
+        df = df[~mask]
+
+        df = df.reset_index()
+        df['subject_turtle'] = "_:" + df['index'].astype('string') + " rdf:subject " + df['s'] + " . \n"
+        df['predicate_turtle'] = "_:" + df['index'].astype('string') + " rdf:predicate " + df['p'] + " . \n"
+        df['object_turtle'] = "_:" + df['index'].astype('string') + " rdf:object " + df['o'] + " . \n"
+        df['certainty_turtle'] = "_:" + df['index'].astype('string') + f" {self.certainty_predicate} \"" + df['certainty'].astype('string') + "\"^^xsd:decimal . \n"
+        df['model_turtle'] = "_:" + df['index'].astype('string') + f" {self.model_predicate} \"" + df['model'] + "\" . \n"
+
+        turtle_data += df['subject_turtle'].str.cat(sep="")
+        turtle_data += df['predicate_turtle'].str.cat(sep="")
+        turtle_data += df['object_turtle'].str.cat(sep="")
+        turtle_data += df['certainty_turtle'].str.cat(sep="")
+
         with open('text.txt', 'w') as f:
             f.write(turtle_data)
         self.upload_turtle(turtle_data)
