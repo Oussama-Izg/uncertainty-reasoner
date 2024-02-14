@@ -85,7 +85,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
                 ?b {self.certainty_predicate} ?certainty .
                 OPTIONAL {{?b {self.model_predicate} ?model}} .}} UNION {{
                     ?s ?p ?o .
-                    FIlTER (!ISBLANK(?s))
+                    FILTER NOT EXISTS{{?s {self.certainty_predicate} ?certainty .}}
                 }}
             }}"""
         return self.read_query(query)
@@ -120,7 +120,8 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         df['predicate_turtle'] = "_:" + df['index'].astype('string') + " rdf:predicate " + df['p'] + " . \n"
         df['object_turtle'] = "_:" + df['index'].astype('string') + " rdf:object " + df['o'] + " . \n"
         df['certainty_turtle'] = "_:" + df['index'].astype('string') + f" {self.certainty_predicate} \"" + df['certainty'].astype('string') + "\"^^xsd:decimal . \n"
-        df['model_turtle'] = "_:" + df['index'].astype('string') + f" {self.model_predicate} \"" + df['model'] + "\" . \n"
+        df['model_turtle'] = ""
+        df.loc[~df['model'].isna(), 'model_turtle'] = "_:" + df['index'].astype('string') + f" {self.model_predicate} \"" + df['model'] + "\" . \n"
 
         turtle_data += df['subject_turtle'].str.cat(sep="")
         turtle_data += df['predicate_turtle'].str.cat(sep="")

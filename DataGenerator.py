@@ -79,5 +79,6 @@ if __name__ == '__main__':
     count = conn.read_into_df().shape[0]
     end = time.time()
     # 23.52 1498500
+    logger.info(f"Done in {end - start} seconds. Queried {count} rows.")
 
 
