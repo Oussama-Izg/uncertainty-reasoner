@@ -37,12 +37,16 @@ class SparqlBaseConnector(ABC):
             'query': query
         }
         response = requests.post(self.query_endpoint, data=data, headers=headers)
+        if not response:
+            raise Exception(f"Failed to query data: {response.reason}")
         return pd.read_csv(io.StringIO(response.text))
 
     def delete_query(self, query=None, delete_all=False):
         if delete_all:
             query = """DELETE {?s ?p ?o}
                        WHERE {?s ?p ?o}"""
+        if query is None and not delete_all:
+            raise Exception("Specify query or use delete_all parameter to delete all triples in the graph.")
         data = {
             'update': query
         }
@@ -128,8 +132,6 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         turtle_data += df['object_turtle'].str.cat(sep="")
         turtle_data += df['certainty_turtle'].str.cat(sep="")
 
-        with open('text.txt', 'w') as f:
-            f.write(turtle_data)
         self.upload_turtle(turtle_data)
 
 
@@ -143,18 +145,34 @@ class SparqlStarConnector(SparqlBaseConnector):
                 query += f"PREFIX {prefix}: <{self.prefixes.get(prefix)}> \n"
             query += f"""
             SELECT ?s ?p ?o ?certainty ?model WHERE {{
-                << ?s ?p ?o >> {self.certainty_predicate} ?certainty .
-                OPTIONAL{{<< ?s ?p ?o >> {self.model_predicate} ?model}} .
+                {{<< << ?s ?p ?o >> {self.certainty_predicate} ?certainty >> {self.model_predicate} ?model .}} UNION {{
+                ?s ?p ?o .
+                MINUS {{ 
+                    ?s ?p ?o .
+                    FILTER(isTRIPLE(?s)) .
+                }} }} UNION {{
+                    << ?s ?p ?o >> {self.certainty_predicate} ?certainty 
+                }}
             }}"""
-        self.read_query(query)
+            print(query)
+        return self.read_query(query)
 
     def upload_df(self, df):
         turtle_data = ""
         for prefix in self.prefixes:
             turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
-        for index, row in df.iterrows():
-            turtle_data += f"<< {row['s']} {row['p']} {row['o']} >> {self.certainty_predicate} \"{row['certainty']}\"^^xsd:decimal . \n"
+        mask = (df['certainty'] == 1) & (df['model'].isna())
+        df['certain_triple'] = ""
+        df.loc[mask, 'certain_triple'] = df['s'] + " " + df['p'] + " " + df['o'] + " . \n"
+        turtle_data += df['certain_triple'].str.cat(sep="")
+        df = df[~mask].copy()
 
+        df['turtle_triple'] = "<< " + df['s'] + " " + df['p'] + " " + df['o'] + f" >> {self.certainty_predicate} \"" + df['certainty'].astype('string') + "\"^^xsd:decimal"
+        df.loc[~df['model'].isna(), 'turtle_triple'] = "<< " + df['turtle_triple'] + f" >> {self.model_predicate} \"" + df['model'] + "\" . \n"
+        df.loc[df['model'].isna(), 'turtle_triple'] = df['turtle_triple'] + " . \n"
+        turtle_data += df['turtle_triple'].str.cat(sep="")
+        with open('text.txt', 'w') as f:
+            f.write(turtle_data)
         self.upload_turtle(turtle_data)
 
 
