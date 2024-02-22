@@ -64,8 +64,11 @@ class SparqlBaseConnector(ABC):
         if not response:
             raise Exception(f"Failed to upload data to SPARQL endpoint: {response.reason}")
 
-    @abstractmethod
     def upload_df(self, df):
+        self.upload_turtle(self.df_to_turtle(df))
+
+    @abstractmethod
+    def df_to_turtle(self, df):
         pass
 
     @abstractmethod
@@ -77,8 +80,9 @@ class ReificationSparqlConnector(SparqlBaseConnector):
     def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None):
         super().__init__(query_endpoint, update_endpoint, gsp_endpoint, prefixes)
 
-    def read_into_df(self, query=""):
+    def read_into_df(self, query=None):
         if not query:
+            query = ""
             for prefix in self.prefixes:
                 query += f"PREFIX {prefix}: <{self.prefixes.get(prefix)}> \n"
             query += f"""
@@ -94,21 +98,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
             }}"""
         return self.read_query(query)
 
-    def upload_df(self, df):
-        """
-        turtle_data = ""
-        for prefix in self.prefixes:
-            turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
-        counter = 1
-        for index, row in df.iterrows():
-            turtle_data += f"_:{counter} rdf:subject {row['s']} . \n"
-            turtle_data += f"_:{counter} rdf:predicate {row['p']} . \n"
-            turtle_data += f"_:{counter} rdf:object {row['o']} . \n"
-            turtle_data += f"_:{counter} {self.certainty_predicate} \"{row['certainty']}\"^^xsd:decimal . \n"
-            counter += 1
-        with open('text.txt', 'w') as f:
-            f.write(turtle_data)
-        self.upload_turtle(turtle_data)"""
+    def df_to_turtle(self, df):
         turtle_data = ""
         for prefix in self.prefixes:
             turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
@@ -132,15 +122,16 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         turtle_data += df['object_turtle'].str.cat(sep="")
         turtle_data += df['certainty_turtle'].str.cat(sep="")
 
-        self.upload_turtle(turtle_data)
+        return turtle_data
 
 
 class SparqlStarConnector(SparqlBaseConnector):
     def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None):
         super().__init__(query_endpoint, update_endpoint, gsp_endpoint, prefixes)
 
-    def read_into_df(self, query=""):
+    def read_into_df(self, query=None):
         if not query:
+            query = ""
             for prefix in self.prefixes:
                 query += f"PREFIX {prefix}: <{self.prefixes.get(prefix)}> \n"
             query += f"""
@@ -154,10 +145,9 @@ class SparqlStarConnector(SparqlBaseConnector):
                     << ?s ?p ?o >> {self.certainty_predicate} ?certainty 
                 }}
             }}"""
-            print(query)
         return self.read_query(query)
 
-    def upload_df(self, df):
+    def df_to_turtle(self, df):
         turtle_data = ""
         for prefix in self.prefixes:
             turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
@@ -171,18 +161,5 @@ class SparqlStarConnector(SparqlBaseConnector):
         df.loc[~df['model'].isna(), 'turtle_triple'] = "<< " + df['turtle_triple'] + f" >> {self.model_predicate} \"" + df['model'] + "\" . \n"
         df.loc[df['model'].isna(), 'turtle_triple'] = df['turtle_triple'] + " . \n"
         turtle_data += df['turtle_triple'].str.cat(sep="")
-        with open('text.txt', 'w') as f:
-            f.write(turtle_data)
-        self.upload_turtle(turtle_data)
 
-
-if __name__ == '__main__':
-    conn = ReificationSparqlConnector("http://localhost:3030/test")
-    query = """
-    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    SELECT * WHERE {
-        ?sub ?pred ?obj .
-    } LIMIT 10
-    """
-    print(conn.read_query(query))
+        return turtle_data

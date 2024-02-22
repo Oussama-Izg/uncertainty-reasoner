@@ -1,11 +1,6 @@
 import pandas as pd
 import numpy as np
-import SparqlConnector
-import logging
-import time
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def generate_data(n, n_models):
     result = pd.DataFrame()
@@ -57,28 +52,7 @@ def generate_data2(lb, ub):
     return df
 
 
-if __name__ == '__main__':
-    conn = SparqlConnector.ReificationSparqlConnector("http://localhost:3030/test/query",
-                                                      "http://localhost:3030/test/update",
-                                                      "http://localhost:3030/test/data")
-    logger.info("Generating data")
-    df1 = generate_data(1000, 3)
-    df2 = generate_data2(1001, 2000)
-    df = pd.concat([df1, df2]).reset_index(drop=True)
 
-    logger.info("Deleting old data")
-    conn.delete_query(delete_all=True)
-    logger.info("Uploading new data")
-    start = time.time()
-    conn.upload_df(df)
-    end = time.time()
-    # 37.62
-    logger.info(f"Done in {end - start} seconds. Inserted {df.shape[0]} rows.")
-    logger.info("Querying data")
-    start = time.time()
-    count = conn.read_into_df().shape[0]
-    end = time.time()
-    # 23.52 1498500
-    logger.info(f"Done in {end - start} seconds. Queried {count} rows.")
+
 
 
