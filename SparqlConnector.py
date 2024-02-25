@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class SparqlBaseConnector(ABC):
     def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None,
                  certainty_predicate="ex:certaintyValue",
-                 model_predicate="ex:accordingTo", concept_predicate="rdf:type"):
+                 model_predicate="ex:accordingTo"):
         if prefixes is None:
             prefixes = {}
 
@@ -27,7 +27,6 @@ class SparqlBaseConnector(ABC):
         self.prefixes = prefixes
         self.certainty_predicate = certainty_predicate
         self.model_predicate = model_predicate
-        self.concept_predicate = concept_predicate
 
     def read_query(self, query):
         headers = {
@@ -66,6 +65,7 @@ class SparqlBaseConnector(ABC):
 
     def upload_df(self, df):
         self.upload_turtle(self.df_to_turtle(df))
+
 
     @abstractmethod
     def df_to_turtle(self, df):
