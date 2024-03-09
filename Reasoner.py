@@ -5,6 +5,7 @@ import time
 from SparqlConnector import SparqlBaseConnector
 from abc import ABC, abstractmethod
 from Exceptions import ConstraintException
+from DempsterShafer import MassFunction
 
 logger = logging.getLogger(__name__)
 
@@ -36,21 +37,15 @@ class Reasoner:
     def load_data_from_endpoint(self, conn: SparqlBaseConnector, query=None):
         logger.info("Querying data")
         start = time.time()
-        self.df_triples = conn.read_into_df(query=query)
+        self.df_triples, self.df_classes = conn.read_into_df(query=query)
+        self.df_triples['certainty'] = self.df_triples['certainty'].fillna(1.0)
         end = time.time()
         logger.info(f"Done in {round(end - start, 3)} seconds. Queried {self.df_triples.shape[0]} rows.")
 
 
     def _compare_dataframes(self, df_before, df_after):
-        change = False
         df_result = pd.concat([df_before, df_after]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).reset_index()
-        if df_result.shape[0] != 0:
-            change = True
-        else:
-            return df_before
         df_result['model'] = df_result['model'].fillna(self.reasoner_name)
-        df_result = df_result.sort_values(by=['certainty'])
-        df_result = df_result.drop_duplicates(subset=['s', 'p', 'o'])
         df_result = pd.concat([df_before, df_result])
         df_result = df_result.sort_values(by=['certainty'])
         df_result = df_result.drop_duplicates(subset=['s', 'p', 'o'])
@@ -172,25 +167,89 @@ class UncertaintyAssignmentAxiom (Axiom):
 
 
 class AFEDempsterShaferAxiom(Axiom):
-    def __init__(self, predicate, ignorance_object='ex:ignorance', ignorance=0.2):
+    def __init__(self, issuer_predicate, issuing_for_predicate, domain_knowledge_predicate='ex:domainKnowledge', ignorance_object='ex:ignorance', ignorance=0.2):
         super().__init__("preprocessing")
-        self.predicate = predicate
+        self.issuer_predicate = issuer_predicate
         self.ignorance = ignorance
         self.ignorance_object = ignorance_object
+        self.domain_knowledge_predicate = domain_knowledge_predicate
+        self.issuing_for_predicate = issuing_for_predicate
 
     def reason(self, df_triples: pd.DataFrame):
-        df_agg = df_triples[(df_triples['p'] == self.predicate) & (df_triples['o'] != self.ignorance_object)].copy()
+        df_domain_knowledge = df_triples[(df_triples['p'] == self.domain_knowledge_predicate)].copy()
+        df_issuer = df_triples[(df_triples['p'] == self.issuer_predicate)].copy()
+        df_issuing_for = df_triples[(df_triples['p'] == self.issuing_for_predicate)].copy()
+        df_issuer = self._process_df(df_issuer)
+        result = pd.DataFrame()
+        for i, coin in df_issuer['s'].drop_duplicates().items():
+            df_issuer_subsets = df_issuer[df_issuer['s'] == coin]
+            df_issuing_for_subsets = df_issuing_for[df_issuing_for['s'] == coin]
+            if df_issuer_subsets.shape[0] == 0:
+                result = pd.concat([result, df_issuer_subsets])
+                continue
+            ignorance = self.ignorance
+            df_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
+            if df_ignorance.shape[0] == 1:
+                ignorance += df_ignorance.iloc[0]
+            issuer_mass_function = MassFunction(self._df_to_subset(df_issuer_subsets))
+            for j, issuing_for in df_issuing_for_subsets['o'].items():
+                df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
+                domain_knowledge_mass_function = MassFunction(self._df_to_subset(df_domain_knowledge_subsets, ignorance))
+                issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
+            result_tmp = {
+                's': [],
+                'p': [],
+                'o': [],
+                'certainty': []
+            }
+            mass_values = issuer_mass_function.get_mass_values()
+            for issuer in mass_values:
+                if issuer == "*":
+                    result_tmp['s'].append(coin)
+                    result_tmp['p'].append(self.issuer_predicate)
+                    result_tmp['o'].append(self.ignorance_object)
+                    result_tmp['certainty'].append(mass_values[issuer])
+                    continue
+                result_tmp['s'].append(coin)
+                result_tmp['p'].append(self.issuer_predicate)
+                result_tmp['o'].append(issuer)
+                result_tmp['certainty'].append(mass_values[issuer])
+            result_tmp = pd.DataFrame(result_tmp)
+            result = pd.concat([result, result_tmp])
+        print(result)
+        df_triples = pd.concat([df_triples[df_triples['p'] != self.issuer_predicate], result])
+        return df_triples
+
+    def _process_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_agg = df[df['o'] != self.ignorance_object].copy()
         df_agg = df_agg.groupby(['s', 'p'])[['o']]
         df_agg = df_agg.count()
 
         df_agg = df_agg.reset_index()
         df_agg = df_agg.rename(columns={'o': 'count'})
 
-        df_triples = pd.merge(df_triples, df_agg, on=['s', 'p'])
-        df_triples['certainty'] = df_triples['certainty'] - self.ignorance / df_triples['count']
-        df_triples = df_triples.drop(columns=['count'])
+        df = pd.merge(df, df_agg, on=['s', 'p'])
+        df.loc[df['o'] != self.ignorance_object, 'certainty'] = df['certainty'] - self.ignorance / \
+                                                                df['count']
+        df.loc[df['o'] == self.ignorance_object, 'certainty'] = df['certainty'] + self.ignorance
+        df = df.drop(columns=['count'])
 
-        return df_triples
+        return df
+
+    def _df_to_subset(self, df: pd.DataFrame, ignorance=None):
+        result = {}
+        if ignorance is None:
+            for i, x in df.iterrows():
+                if x['o'] == self.ignorance_object:
+                    result['*'] = x['certainty']
+                else:
+                    result[x['o']] = x['certainty']
+        else:
+            certainty = (1 - ignorance) / df.shape[0]
+            result['*'] = ignorance
+            for i, x in df.iterrows():
+                result[x['o']] = certainty
+        return result
 
 
 class NormalizationAxiom(Axiom):

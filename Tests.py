@@ -72,5 +72,21 @@ def reasoner_test_aggregation_mean():
 
     reasoner.reason()
 
+def test_AFE_DST():
+    df_afe = pd.read_csv('afe_test_data.csv')
+    conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
+                                               "http://localhost:3030/test/update",
+                                               "http://localhost:3030/test/data")
+    conn.delete_query(delete_all=True)
+    conn.upload_df(df_afe)
+    axioms = [
+        Reasoner.AFEDempsterShaferAxiom('ex:issuer', 'ex:issuing_for', 'ex:domain_knowledge')
+    ]
+
+    reasoner = Reasoner.Reasoner(axioms)
+    reasoner.load_data_from_endpoint(conn)
+
+    reasoner.reason()
+
 if __name__ == '__main__':
-    reasoner_test_aggregation_mean()
+    test_AFE_DST()

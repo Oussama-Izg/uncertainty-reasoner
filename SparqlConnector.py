@@ -70,16 +70,21 @@ class SparqlBaseConnector(ABC):
     def download_df(self, query=''):
         self._add_classes(self.read_into_df(query))
 
-    def _add_classes(self, df_triples):
+    def get_classes(self, df_triples):
         df_classes = df_triples[df_triples['p'] == self.class_predicate].copy()
+        df_triples = df_triples[df_triples['p'] != self.class_predicate].copy()
         df_classes = df_classes[['s', 'o']]
-        df_classes = df_classes.rename(columns={'o': 'class'})
-        df_triples = pd.merge(df_triples, df_classes, left_on='s', right_on='s', how='left')
-        df_triples = df_triples.rename(columns={'class': 's_concept'})
-        df_triples = pd.merge(df_triples, df_classes, left_on='o', right_on='s', how='left')
-        df_triples = df_triples.rename(columns={'class': 'o_concept'})
+        df_classes = df_classes.rename(columns={
+            's': 'node',
+            'o': 'class',
+        })
 
-        return df_triples
+        return df_triples, df_classes
+
+    def _apply_prefixes(self, df: pd.DataFrame):
+        prefix_mapping = {value: key+":" for key, value in self.prefixes.items()}
+        df = df.replace(prefix_mapping, regex=True)
+        return df
 
     @abstractmethod
     def df_to_turtle(self, df_triples):
@@ -110,7 +115,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
                     FILTER NOT EXISTS{{?s {self.certainty_predicate} ?certainty .}}
                 }}
             }}"""
-        return self._add_classes(self.read_query(query))
+        return self.get_classes(self._apply_prefixes(self.read_query(query)))
 
     def df_to_turtle(self, df_triples):
         turtle_data = ""
@@ -159,7 +164,7 @@ class SparqlStarConnector(SparqlBaseConnector):
                     << ?s ?p ?o >> {self.certainty_predicate} ?certainty 
                 }}
             }}"""
-        return self._add_classes(self.read_query(query))
+        return self.get_classes(self._apply_prefixes(self.read_query(query)))
 
     def df_to_turtle(self, df_triples):
         turtle_data = ""
