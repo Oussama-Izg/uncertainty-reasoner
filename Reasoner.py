@@ -42,7 +42,6 @@ class Reasoner:
         end = time.time()
         logger.info(f"Done in {round(end - start, 3)} seconds. Queried {self.df_triples.shape[0]} rows.")
 
-
     def _compare_dataframes(self, df_before, df_after):
         df_result = pd.concat([df_before, df_after]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).reset_index()
         df_result['model'] = df_result['model'].fillna(self.reasoner_name)
@@ -60,7 +59,7 @@ class Reasoner:
             logger.info(f"Starting preprocessing.")
             start_postprocessing = time.time()
             for axiom in self.preprocessing_axioms:
-                self.df_triples = axiom.reason(self.df_triples)
+                self.df_triples = axiom.reason(self.df_triples, self.df_classes)
             end_postprocessing = time.time()
 
             logger.info(f"Preprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
@@ -74,7 +73,10 @@ class Reasoner:
                 counter += 1
                 df_old = self.df_triples.copy()
                 for axiom in self.rule_reasoning_axioms:
-                    self.df_triples = axiom.reason(self.df_triples)
+                    self.df_triples = axiom.reason(self.df_triples, self.df_classes)
+
+                for axiom in self.constraint_axioms:
+                    self.df_triples = axiom.reason(self.df_triples, self.df_classes)
                 if pd.concat([df_old, self.df_triples]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).shape[0] == 0:
                     break
             end_rule_reasoning = time.time()
@@ -85,7 +87,7 @@ class Reasoner:
             logger.info(f"Starting postprocessing.")
             start_postprocessing = time.time()
             for axiom in self.postprocessing_axioms:
-                self.df_triples = axiom.reason(self.df_triples)
+                self.df_triples = axiom.reason(self.df_triples, self.df_classes)
             end_postprocessing = time.time()
 
             logger.info(f"Postprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
@@ -114,7 +116,7 @@ class Axiom(ABC):
         return self.type
 
     @abstractmethod
-    def reason(self, df_triples):
+    def reason(self, df_triples, df_classes):
         pass
 
 
@@ -130,7 +132,7 @@ class AggregationAxiom(Axiom):
 
         self.aggregation_type = aggregation_type
 
-    def reason(self, df_triples: pd.DataFrame):
+    def reason(self, df_triples: pd.DataFrame, df_classes):
         df_agg = df_triples[df_triples['p'] == self.source_predicate].copy()
         df_agg = df_agg.groupby(['s', 'p', 'o', 's_class', 'o_class'])[['certainty']]
 
@@ -151,7 +153,7 @@ class UncertaintyAssignmentAxiom (Axiom):
         super().__init__("preprocessing")
         self.predicate = predicate
 
-    def reason(self, df_triples: pd.DataFrame):
+    def reason(self, df_triples: pd.DataFrame, df_classes):
         df_agg = df_triples[df_triples['p'] == self.predicate].copy()
         df_agg = df_agg.groupby(['s', 'p'])[['o']]
         df_agg = df_agg.count()
@@ -175,7 +177,7 @@ class AFEDempsterShaferAxiom(Axiom):
         self.domain_knowledge_predicate = domain_knowledge_predicate
         self.issuing_for_predicate = issuing_for_predicate
 
-    def reason(self, df_triples: pd.DataFrame):
+    def reason(self, df_triples: pd.DataFrame, df_classes):
         df_domain_knowledge = df_triples[(df_triples['p'] == self.domain_knowledge_predicate)].copy()
         df_issuer = df_triples[(df_triples['p'] == self.issuer_predicate)].copy()
         df_issuing_for = df_triples[(df_triples['p'] == self.issuing_for_predicate)].copy()
@@ -257,7 +259,7 @@ class NormalizationAxiom(Axiom):
         super().__init__("postprocessing")
         self.predicate = predicate
 
-    def reason(self, df_triples: pd.DataFrame):
+    def reason(self, df_triples: pd.DataFrame, df_classes):
         df_agg = df_triples[df_triples['p'] == self.predicate].copy()
         df_agg = df_agg.groupby(['s', 'p', 'o'])[['certainty']]
         df_agg = df_agg.sum()
@@ -277,7 +279,7 @@ class InverseAxiom(Axiom):
         super().__init__('rule_based_reasoning')
         self.predicate = predicate
 
-    def reason(self, df_triples: pd.DataFrame):
+    def reason(self, df_triples: pd.DataFrame, df_classes):
         df_tmp = df_triples[df_triples['p'] == self.predicate].copy()
         df_tmp = df_tmp.rename(columns={'s': 's_t'})
         df_tmp = df_tmp.rename(columns={'s_t': 'o', 'o': 's'})
@@ -302,16 +304,24 @@ class RoleChainAxiom(Axiom):
             raise ValueError("Reasoning logic must be product, goedel or lukasiewicz.")
         self.reasoning_logic = reasoning_logic
 
-    def reason(self, df_triples):
+    def reason(self, df_triples, df_classes):
         df_triples_left = df_triples[df_triples['p'] == self.antecedent1]
         df_triples_right = df_triples[df_triples['p'] == self.antecedent2]
         if self.class1:
-            df_triples_left = df_triples_left[df_triples_left['s_class'] == self.class1]
+            df_triples_left = pd.merge(df_triples_left, df_classes[df_classes['class'] == self.class1],
+                                       right_on='s', left_on='node')
+            df_triples_left = df_triples_left.drop(columns=['node'])
         if self.class1:
-            df_triples_left = df_triples_left[df_triples_left['o_class'] == self.class2]
-            df_triples_right = df_triples_right[df_triples_right['s_class'] == self.class2]
+            df_triples_left = pd.merge(df_triples_left, df_classes[df_classes['class'] == self.class2],
+                                       right_on='o', left_on='node')
+            df_triples_left = df_triples_left.drop(columns=['node'])
+            df_triples_right = pd.merge(df_triples_right, df_classes[df_classes['class'] == self.class2],
+                                       right_on='s', left_on='node')
+            df_triples_right = df_triples_right.drop(columns=['node'])
         if self.class3:
-            df_triples_right = df_triples_right[df_triples_right['o_class'] == self.class3]
+            df_triples_right = pd.merge(df_triples_right, df_classes[df_classes['class'] == self.class3],
+                                        right_on='o', left_on='node')
+            df_triples_right = df_triples_right.drop(columns=['node'])
 
         df_result = pd.merge(df_triples_left, df_triples_right, left_on='o', right_on='s')
         if self.reasoning_logic == 'product':
@@ -348,7 +358,7 @@ class DisjointAxiom(Axiom):
         self.predicate1 = predicate1
         self.predicate2 = predicate2
 
-    def reason(self, df_triples: pd.DataFrame):
+    def reason(self, df_triples: pd.DataFrame, df_classes):
         df_tmp = df_triples[(df_triples['p'] == self.predicate1) | (df_triples['p'] == self.predicate2)].groupby(['s', 'o'])['p'].count()
         df_tmp = df_tmp.reset_index()
 
@@ -363,7 +373,7 @@ class SelfDisjointAxiom(Axiom):
         super().__init__("constraint")
         self.predicate = predicate
 
-    def reason(self, df_triples: pd.DataFrame):
+    def reason(self, df_triples: pd.DataFrame, df_classes):
         df_tmp = df_triples[df_triples['p'] == self.predicate]
         if (df_tmp['s'] == df_tmp['o']).sum() != 0:
             raise ConstraintException(f"Constraint violation for predicate {self.predicate}")
