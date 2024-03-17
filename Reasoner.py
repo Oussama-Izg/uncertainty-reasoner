@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import numpy as np
 import time
 
 from SparqlConnector import SparqlBaseConnector
@@ -43,11 +44,15 @@ class Reasoner:
         logger.info(f"Done in {round(end - start, 3)} seconds. Queried {self.df_triples.shape[0]} rows.")
 
     def _compare_dataframes(self, df_before, df_after):
-        df_result = pd.concat([df_before, df_after]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).reset_index()
+        # Find rows with new values
+        df_result = pd.concat([df_before, df_after]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).reset_index(drop=True)
+        # Set reasoner name as model
         df_result['model'] = df_result['model'].fillna(self.reasoner_name)
         df_result = pd.concat([df_before, df_result])
-        df_result = df_result.sort_values(by=['certainty'])
-        df_result = df_result.drop_duplicates(subset=['s', 'p', 'o'])
+
+        # Just a quick check, that only the highest certainties are used
+        df_result = df_result.sort_values(by=['certainty'], ascending=True)
+        df_result = df_result.drop_duplicates(subset=['s', 'p', 'o', 'model'])
 
         return df_result
 
@@ -60,6 +65,7 @@ class Reasoner:
             start_postprocessing = time.time()
             for axiom in self.preprocessing_axioms:
                 self.df_triples = axiom.reason(self.df_triples, self.df_classes)
+                self.df_triples = self.df_triples[['s', 'p', 'o', 'certainty', 'model']]
             end_postprocessing = time.time()
 
             logger.info(f"Preprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
@@ -91,11 +97,12 @@ class Reasoner:
             end_postprocessing = time.time()
 
             logger.info(f"Postprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
-
         self.df_triples = self._compare_dataframes(df_before, self.df_triples)
         self.df_triples = pd.concat([self.df_triples, df_triples_with_model])
         end_reasoning = time.time()
         logger.info(f"Reasoning done in {round(end_reasoning - start_reasoning, 3)} seconds.")
+
+        return self.df_triples
 
     def save_data_to_file(self, file_name, conn: SparqlBaseConnector, only_new: bool = False):
         with open(file_name, "rw") as f:
@@ -122,10 +129,9 @@ class Axiom(ABC):
 
 class AggregationAxiom(Axiom):
 
-    def __init__(self, source_predicate, target_predicate, aggregation_type):
+    def __init__(self, predicate, aggregation_type):
         super().__init__("preprocessing")
-        self.source_predicate = source_predicate
-        self.target_predicate = target_predicate
+        self.predicate = predicate
 
         if aggregation_type not in ['mean', 'median']:
             raise ValueError("aggregation_type must be mean or median")
@@ -133,8 +139,8 @@ class AggregationAxiom(Axiom):
         self.aggregation_type = aggregation_type
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
-        df_agg = df_triples[df_triples['p'] == self.source_predicate].copy()
-        df_agg = df_agg.groupby(['s', 'p', 'o', 's_class', 'o_class'])[['certainty']]
+        df_agg = df_triples[df_triples['p'] == self.predicate].copy()
+        df_agg = df_agg.groupby(['s', 'p', 'o'])[['certainty']]
 
         if self.aggregation_type == 'mean':
             df_agg = df_agg.mean()
@@ -145,31 +151,103 @@ class AggregationAxiom(Axiom):
 
         df_agg = df_agg.reset_index()
 
-        return pd.concat([df_triples, df_agg])
+        return pd.concat([df_triples, df_agg]).drop_duplicates()
 
 
 class UncertaintyAssignmentAxiom (Axiom):
-    def __init__(self, predicate):
+    def __init__(self, predicate, uncertainty_object="ex:uncertain", default_uncertainty=0.2):
         super().__init__("preprocessing")
         self.predicate = predicate
+        self.uncertainty_object = uncertainty_object
+        self.default_uncertainty = default_uncertainty
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
-        df_agg = df_triples[df_triples['p'] == self.predicate].copy()
+        df_selected_triples = df_triples[df_triples['p'] == self.predicate].copy()
+        df_triples = df_triples[df_triples['p'] != self.predicate]
+        df_agg = df_selected_triples[df_selected_triples['o'] != self.uncertainty_object].copy()
         df_agg = df_agg.groupby(['s', 'p'])[['o']]
         df_agg = df_agg.count()
 
         df_agg = df_agg.reset_index()
         df_agg = df_agg.rename(columns={'o': 'count'})
 
-        df_triples = pd.merge(df_triples, df_agg, on=['s', 'p'])
-        df_triples['certainty'] = 1 / df_triples['count']
-        df_triples = df_triples.drop(columns=['count'])
+        df_selected_triples = pd.merge(df_selected_triples, df_agg, on=['s', 'p'])
+        df_selected_triples = pd.merge(df_selected_triples, df_selected_triples[df_selected_triples['o'] == self.uncertainty_object][['s', 'p']],
+                                       on=['s', 'p'], how='left', indicator=True)
+        df_selected_triples['certainty'] = 1 / df_selected_triples['count']
+        df_selected_triples.loc[df_selected_triples['_merge'] == 'both', 'certainty'] = (1 - self.default_uncertainty) / df_selected_triples['count']
+        df_selected_triples.loc[df_selected_triples['o'] == self.uncertainty_object, 'certainty'] = self.default_uncertainty
 
+        df_selected_triples = df_selected_triples.drop(columns=['count'])
+
+        return pd.concat([df_selected_triples, df_triples])
+
+
+class DempsterShaferAxiom(Axiom):
+    def __init__(self, predicate, ignorance_object='ex:uncertain', ignorance=0.2):
+        super().__init__("preprocessing")
+        self.predicate = predicate
+        self.ignorance = ignorance
+        self.ignorance_object = ignorance_object
+
+    def reason(self, df_triples: pd.DataFrame, df_classes):
+        df_selected_triples = df_triples[(df_triples['p'] == self.predicate)].copy()
+        result = pd.DataFrame()
+        for i, s in df_selected_triples['s'].drop_duplicates().items():
+            df_subsets = df_selected_triples[df_selected_triples['s'] == s]
+            joinT_mass_function = None
+            if len(df_subsets['model'].drop_duplicates().items()) == 1:
+                result = pd.concat([result, df_subsets])
+
+            for j, model in df_subsets['model'].drop_duplicates().items():
+                df_model_subsets = df_selected_triples[df_selected_triples['model'] == model]
+
+                issuer_ignorance = self.ignorance
+                df_ignorance = df_model_subsets[df_model_subsets['o'] == self.ignorance_object]
+                if df_ignorance.shape[0] == 1:
+                    issuer_ignorance += df_ignorance['certainty'].iloc[0]
+                df_model_subsets = df_model_subsets[df_model_subsets['o'] != self.ignorance_object]
+                if joinT_mass_function is None:
+                    joinT_mass_function = MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance))
+                else:
+                    joinT_mass_function = joinT_mass_function.join_masses(MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance)))
+
+            mass_values = joinT_mass_function.get_mass_values()
+            for issuer in mass_values:
+                if issuer == "*":
+                    result_tmp['s'].append(s)
+                    result_tmp['p'].append(self.predicate)
+                    result_tmp['o'].append(self.ignorance_object)
+                    result_tmp['certainty'].append(mass_values[issuer])
+                    continue
+                result_tmp['s'].append(s)
+                result_tmp['p'].append(self.predicate)
+                result_tmp['o'].append(issuer)
+                result_tmp['certainty'].append(mass_values[issuer])
+            result_tmp = pd.DataFrame(result_tmp)
+            result = pd.concat([result, result_tmp])
+        result['model'] = np.nan
+        df_triples = pd.concat([df_triples[df_triples['p'] != self.predicate], result])
         return df_triples
+
+    def _df_to_subset(self, df: pd.DataFrame, ignorance=None):
+        result = {}
+        if ignorance is None:
+            for i, x in df.iterrows():
+                if x['o'] == self.ignorance_object:
+                    result['*'] = x['certainty']
+                else:
+                    result[x['o']] = x['certainty']
+        else:
+            certainty = (1 - ignorance) / df.shape[0]
+            result['*'] = ignorance
+            for i, x in df.iterrows():
+                result[x['o']] = certainty
+        return result
 
 
 class AFEDempsterShaferAxiom(Axiom):
-    def __init__(self, issuer_predicate, issuing_for_predicate, domain_knowledge_predicate='ex:domainKnowledge', ignorance_object='ex:ignorance', ignorance=0.2):
+    def __init__(self, issuer_predicate, issuing_for_predicate, domain_knowledge_predicate='ex:domain_knowledge', ignorance_object='ex:uncertain', ignorance=0.2):
         super().__init__("preprocessing")
         self.issuer_predicate = issuer_predicate
         self.ignorance = ignorance
@@ -181,22 +259,31 @@ class AFEDempsterShaferAxiom(Axiom):
         df_domain_knowledge = df_triples[(df_triples['p'] == self.domain_knowledge_predicate)].copy()
         df_issuer = df_triples[(df_triples['p'] == self.issuer_predicate)].copy()
         df_issuing_for = df_triples[(df_triples['p'] == self.issuing_for_predicate)].copy()
-        df_issuer = self._process_df(df_issuer)
+        # df_issuer = self._process_df(df_issuer)
         result = pd.DataFrame()
         for i, coin in df_issuer['s'].drop_duplicates().items():
             df_issuer_subsets = df_issuer[df_issuer['s'] == coin]
             df_issuing_for_subsets = df_issuing_for[df_issuing_for['s'] == coin]
-            if df_issuer_subsets.shape[0] == 0:
+            if df_issuing_for_subsets.shape[0] == 0:
                 result = pd.concat([result, df_issuer_subsets])
                 continue
-            ignorance = self.ignorance
-            df_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
-            if df_ignorance.shape[0] == 1:
-                ignorance += df_ignorance.iloc[0]
-            issuer_mass_function = MassFunction(self._df_to_subset(df_issuer_subsets))
+
+            issuer_ignorance = self.ignorance
+            df_issuer_ignorance = df_issuer_subsets[df_issuer_subsets['o'] == self.ignorance_object]
+            if df_issuer_ignorance.shape[0] == 1:
+                issuer_ignorance += df_issuer_ignorance['certainty'].iloc[0]
+            df_issuer_subsets = df_issuer_subsets[df_issuer_subsets['o'] != self.ignorance_object]
+
+            issuing_for_ignorance = self.ignorance
+            df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
+            if df_issuing_for_ignorance.shape[0] == 1:
+                issuing_for_ignorance += df_issuing_for_ignorance['certainty'].iloc[0]
+            df_issuing_for_subsets = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
+
+            issuer_mass_function = MassFunction(self._df_to_subset(df_issuer_subsets, issuer_ignorance))
             for j, issuing_for in df_issuing_for_subsets['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
-                domain_knowledge_mass_function = MassFunction(self._df_to_subset(df_domain_knowledge_subsets, ignorance))
+                domain_knowledge_mass_function = MassFunction(self._df_to_subset(df_domain_knowledge_subsets, issuing_for_ignorance))
                 issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
             result_tmp = {
                 's': [],
@@ -218,25 +305,8 @@ class AFEDempsterShaferAxiom(Axiom):
                 result_tmp['certainty'].append(mass_values[issuer])
             result_tmp = pd.DataFrame(result_tmp)
             result = pd.concat([result, result_tmp])
-        print(result)
         df_triples = pd.concat([df_triples[df_triples['p'] != self.issuer_predicate], result])
         return df_triples
-
-    def _process_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        df_agg = df[df['o'] != self.ignorance_object].copy()
-        df_agg = df_agg.groupby(['s', 'p'])[['o']]
-        df_agg = df_agg.count()
-
-        df_agg = df_agg.reset_index()
-        df_agg = df_agg.rename(columns={'o': 'count'})
-
-        df = pd.merge(df, df_agg, on=['s', 'p'])
-        df.loc[df['o'] != self.ignorance_object, 'certainty'] = df['certainty'] - self.ignorance / \
-                                                                df['count']
-        df.loc[df['o'] == self.ignorance_object, 'certainty'] = df['certainty'] + self.ignorance
-        df = df.drop(columns=['count'])
-
-        return df
 
     def _df_to_subset(self, df: pd.DataFrame, ignorance=None):
         result = {}

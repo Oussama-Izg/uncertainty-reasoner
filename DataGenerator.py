@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-def generate_data(n, n_models):
+def generate_vague_similarity_data(n, n_models):
     result = pd.DataFrame()
     for model_nr in range(1, n_models+1):
         cn_type_numbers = np.arange(1, n+1)
@@ -14,7 +14,7 @@ def generate_data(n, n_models):
             'from_y': 'o'
         })
 
-        # A similar B -> B similar A
+        # A similar B <-> B similar A
         # Therfore, you remove the duplicates
         df['tmp'] = df['s'].astype('string')+","+df['o'].astype('string')
         df.loc[df['s'] < df['o'], 'tmp'] = df['o'].astype('string')+","+df['s'].astype('string')
@@ -31,7 +31,8 @@ def generate_data(n, n_models):
         result = pd.concat([result, df])
     return result.reset_index(drop=True)
 
-def generate_data2(lb, ub):
+
+def generate_similarity_data(lb, ub):
     cn_type_numbers_from = np.arange(lb, ub+1)
     cn_type_numbers_to = cn_type_numbers_from.copy()
     np.random.shuffle(cn_type_numbers_to)
