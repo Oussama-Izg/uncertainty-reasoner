@@ -13,41 +13,38 @@ logger = logging.getLogger(__name__)
 
 class Reasoner:
     def __init__(self, axioms, max_iterations=100, reasoner_name='uncertainty_reasoner'):
-        self.preprocessing_axioms = []
-        self.rule_reasoning_axioms = []
-        self.postprocessing_axioms = []
-        self.constraint_axioms = []
-        self.reasoner_name = reasoner_name
+        self._preprocessing_axioms = []
+        self._rule_reasoning_axioms = []
+        self._postprocessing_axioms = []
+        self._reasoner_name = reasoner_name
 
-        self.df_triples = pd.DataFrame()
-        self.df_classes = pd.DataFrame()
-        self.max_iterations = max_iterations
+        self._df_triples = pd.DataFrame()
+        self._df_classes = pd.DataFrame()
+        self._max_iterations = max_iterations
 
         for axiom in axioms:
-            if axiom.get_type() == "postprocessing":
-                self.postprocessing_axioms.append(axiom)
-            elif axiom.get_type() == "preprocessing":
-                self.preprocessing_axioms.append(axiom)
-            elif axiom.get_type() == "rule_based_reasoning":
-                self.rule_reasoning_axioms.append(axiom)
-            elif axiom.get_type() == "constraint":
-                self.constraint_axioms.append(axiom)
+            if axiom.get_stage() == "postprocessing":
+                self._postprocessing_axioms.append(axiom)
+            elif axiom.get_stage() == "preprocessing":
+                self._preprocessing_axioms.append(axiom)
+            elif axiom.get_stage() == "rule_based_reasoning":
+                self._rule_reasoning_axioms.append(axiom)
             else:
-                raise ValueError(f"Unknown axiom type given {axiom.get_type()}")
+                raise ValueError(f"Unknown axiom type given {axiom.get_stage()}")
 
     def load_data_from_endpoint(self, conn: SparqlBaseConnector, query=None):
         logger.info("Querying data")
         start = time.time()
-        self.df_triples, self.df_classes = conn.read_into_df(query=query)
-        self.df_triples['certainty'] = self.df_triples['certainty'].fillna(1.0)
+        self._df_triples, self._df_classes = conn.read_into_df(query=query)
+        self._df_triples['certainty'] = self._df_triples['certainty'].fillna(1.0)
         end = time.time()
-        logger.info(f"Done in {round(end - start, 3)} seconds. Queried {self.df_triples.shape[0]} rows.")
+        logger.info(f"Done in {round(end - start, 3)} seconds. Queried {self._df_triples.shape[0]} rows.")
 
     def _compare_dataframes(self, df_before, df_after):
         # Find rows with new values
         df_result = pd.concat([df_before, df_after]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).reset_index(drop=True)
         # Set reasoner name as model
-        df_result['model'] = df_result['model'].fillna(self.reasoner_name)
+        df_result['model'] = df_result['model'].fillna(self._reasoner_name)
         df_result = pd.concat([df_before, df_result])
 
         # Just a quick check, that only the highest certainties are used
@@ -59,68 +56,67 @@ class Reasoner:
     def reason(self):
         logger.info(f"Starting reasoning.")
         start_reasoning = time.time()
-        df_before = self.df_triples.copy()
-        if len(self.preprocessing_axioms) != 0:
+        df_before = self._df_triples.copy()
+        if len(self._preprocessing_axioms) != 0:
             logger.info(f"Starting preprocessing.")
             start_postprocessing = time.time()
-            for axiom in self.preprocessing_axioms:
-                self.df_triples = axiom.reason(self.df_triples, self.df_classes)
-                self.df_triples = self.df_triples[['s', 'p', 'o', 'certainty', 'model']]
+            for axiom in self._preprocessing_axioms:
+                self._df_triples = axiom.reason(self._df_triples, self._df_classes)
+                self._df_triples = self._df_triples[['s', 'p', 'o', 'certainty', 'model']]
             end_postprocessing = time.time()
 
             logger.info(f"Preprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
-        df_triples_with_model = self.df_triples[~self.df_triples['model'].isna()].copy()
-        self.df_triples = self.df_triples[self.df_triples['model'].isna()].copy()
-        if len(self.rule_reasoning_axioms) != 0:
+        df_triples_with_model = self._df_triples[~self._df_triples['model'].isna()].copy()
+        self._df_triples = self._df_triples[self._df_triples['model'].isna()].copy()
+        if len(self._rule_reasoning_axioms) != 0:
             logger.info(f"Starting rule based reasoning.")
             start_rule_reasoning = time.time()
             counter = 0
-            for i in range(self.max_iterations):
+            for i in range(self._max_iterations):
                 counter += 1
-                df_old = self.df_triples.copy()
-                for axiom in self.rule_reasoning_axioms:
-                    self.df_triples = axiom.reason(self.df_triples, self.df_classes)
-
-                for axiom in self.constraint_axioms:
-                    self.df_triples = axiom.reason(self.df_triples, self.df_classes)
-                if pd.concat([df_old, self.df_triples]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).shape[0] == 0:
+                df_old = self._df_triples.copy()
+                for axiom in self._rule_reasoning_axioms:
+                    self._df_triples = axiom.reason(self._df_triples, self._df_classes)
+                if pd.concat([df_old, self._df_triples]).drop_duplicates(subset=['s', 'p', 'o', 'certainty'], keep=False).shape[0] == 0:
                     break
             end_rule_reasoning = time.time()
 
             logger.info(f"Rule based reasoning done after {counter} iterations in {round(end_rule_reasoning - start_rule_reasoning, 3)} seconds.")
 
-        if len(self.postprocessing_axioms) != 0:
+        if len(self._postprocessing_axioms) != 0:
             logger.info(f"Starting postprocessing.")
             start_postprocessing = time.time()
-            for axiom in self.postprocessing_axioms:
-                self.df_triples = axiom.reason(self.df_triples, self.df_classes)
+            for axiom in self._postprocessing_axioms:
+                self._df_triples = axiom.reason(self._df_triples, self._df_classes)
             end_postprocessing = time.time()
 
             logger.info(f"Postprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
-        self.df_triples = self._compare_dataframes(df_before, self.df_triples)
-        self.df_triples = pd.concat([self.df_triples, df_triples_with_model])
+        self._df_triples = self._compare_dataframes(df_before, self._df_triples)
+        self._df_triples = pd.concat([self._df_triples, df_triples_with_model])
         end_reasoning = time.time()
         logger.info(f"Reasoning done in {round(end_reasoning - start_reasoning, 3)} seconds.")
 
-        return self.df_triples
+    def get_triples_as_df(self):
+        return self._df_triples
+
 
     def save_data_to_file(self, file_name, conn: SparqlBaseConnector, only_new: bool = False):
         with open(file_name, "rw") as f:
             if only_new:
-                f.write(conn.df_to_turtle(self.df_triples['model'] == self.reasoner_name))
+                f.write(conn.df_to_turtle(self._df_triples['model'] == self._reasoner_name))
             else:
-                f.write(conn.df_to_turtle(self.df_triples))
+                f.write(conn.df_to_turtle(self._df_triples))
 
     def upload_data_to_endpoint(self, conn: SparqlBaseConnector):
-        conn.upload_df(self.df_triples)
+        conn.upload_df(self._df_triples)
 
 
 class Axiom(ABC):
-    def __init__(self, type):
-        self.type = type
+    def __init__(self, stage):
+        self._stage = stage
 
-    def get_type(self):
-        return self.type
+    def get_stage(self):
+        return self._stage
 
     @abstractmethod
     def reason(self, df_triples, df_classes):
@@ -359,7 +355,7 @@ class InverseAxiom(Axiom):
         return df_triples
 
 
-class RoleChainAxiom(Axiom):
+class ChainRuleAxiom(Axiom):
     def __init__(self, antecedent1, antecedent2, consequent, reasoning_logic, class_1=None, class_2=None,
                  class_3=None):
         super().__init__('rule_based_reasoning')
@@ -424,7 +420,7 @@ class RoleChainAxiom(Axiom):
 
 class DisjointAxiom(Axiom):
     def __init__(self, predicate1, predicate2):
-        super().__init__("constraint")
+        super().__init__("rule_based_reasoning")
         self.predicate1 = predicate1
         self.predicate2 = predicate2
 
@@ -440,7 +436,7 @@ class DisjointAxiom(Axiom):
 
 class SelfDisjointAxiom(Axiom):
     def __init__(self, predicate):
-        super().__init__("constraint")
+        super().__init__("rule_based_reasoning")
         self.predicate = predicate
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
