@@ -8,8 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class SparqlBaseConnector(ABC):
+
     def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None,
-                 certainty_predicate="ex:certaintyValue",
+                 weight_predicate="ex:certaintyValue",
                  model_predicate="ex:accordingTo", class_predicate="rdf:type"):
         if prefixes is None:
             prefixes = {}
@@ -25,7 +26,7 @@ class SparqlBaseConnector(ABC):
         self.update_endpoint = update_endpoint
         self.gsp_endpoint = gsp_endpoint
         self.prefixes = prefixes
-        self.certainty_predicate = certainty_predicate
+        self.weight_predicate = weight_predicate
         self.model_predicate = model_predicate
         self.class_predicate = class_predicate
 
@@ -105,14 +106,14 @@ class ReificationSparqlConnector(SparqlBaseConnector):
             for prefix in self.prefixes:
                 query += f"PREFIX {prefix}: <{self.prefixes.get(prefix)}> \n"
             query += f"""
-            SELECT ?s ?p ?o ?certainty ?model WHERE {{
+            SELECT ?s ?p ?o ?weight ?model WHERE {{
                 {{?b rdf:subject ?s .
                 ?b rdf:predicate ?p .
                 ?b rdf:object ?o .
-                ?b {self.certainty_predicate} ?certainty .
+                ?b {self.weight_predicate} ?weight .
                 OPTIONAL {{?b {self.model_predicate} ?model}} .}} UNION {{
                     ?s ?p ?o .
-                    FILTER NOT EXISTS{{?s {self.certainty_predicate} ?certainty .}}
+                    FILTER NOT EXISTS{{?s {self.weight_predicate} ?weight .}}
                 }}
             }}"""
         return self.get_classes(self._apply_prefixes(self.read_query(query)))
@@ -122,7 +123,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         for prefix in self.prefixes:
             turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
 
-        mask = (df_triples['certainty'] == 1) & (df_triples['model'].isna())
+        mask = (df_triples['weight'] == 1) & (df_triples['model'].isna())
         df_triples['certain_triple'] = ""
         df_triples.loc[mask, 'certain_triple'] = df_triples['s'] + " " + df_triples['p'] + " " + df_triples['o'] + " . \n"
         turtle_data += df_triples['certain_triple'].str.cat(sep="")
@@ -132,7 +133,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         df_triples['subject_turtle'] = "_:" + df_triples['index'].astype('string') + " rdf:subject " + df_triples['s'] + " . \n"
         df_triples['predicate_turtle'] = "_:" + df_triples['index'].astype('string') + " rdf:predicate " + df_triples['p'] + " . \n"
         df_triples['object_turtle'] = "_:" + df_triples['index'].astype('string') + " rdf:object " + df_triples['o'] + " . \n"
-        df_triples['certainty_turtle'] = "_:" + df_triples['index'].astype('string') + f" {self.certainty_predicate} \"" + df_triples['certainty'].astype('string') + "\"^^xsd:decimal . \n"
+        df_triples['certainty_turtle'] = "_:" + df_triples['index'].astype('string') + f" {self.weight_predicate} \"" + df_triples['weight'].astype('string') + "\"^^xsd:decimal . \n"
         df_triples['model_turtle'] = ""
         df_triples.loc[~df_triples['model'].isna(), 'model_turtle'] = "_:" + df_triples['index'].astype('string') + f" {self.model_predicate} \"" + df_triples['model'] + "\" . \n"
 
@@ -154,14 +155,14 @@ class SparqlStarConnector(SparqlBaseConnector):
             for prefix in self.prefixes:
                 query += f"PREFIX {prefix}: <{self.prefixes.get(prefix)}> \n"
             query += f"""
-            SELECT ?s ?p ?o ?certainty ?model WHERE {{
-                {{<< << ?s ?p ?o >> {self.certainty_predicate} ?certainty >> {self.model_predicate} ?model .}} UNION {{
+            SELECT ?s ?p ?o ?weight ?model WHERE {{
+                {{<< << ?s ?p ?o >> {self.weight_predicate} ?weight >> {self.model_predicate} ?model .}} UNION {{
                 ?s ?p ?o .
                 MINUS {{ 
                     ?s ?p ?o .
                     FILTER(isTRIPLE(?s)) .
                 }} }} UNION {{
-                    << ?s ?p ?o >> {self.certainty_predicate} ?certainty 
+                    << ?s ?p ?o >> {self.weight_predicate} ?weight 
                 }}
             }}"""
         return self.get_classes(self._apply_prefixes(self.read_query(query)))
@@ -170,13 +171,13 @@ class SparqlStarConnector(SparqlBaseConnector):
         turtle_data = ""
         for prefix in self.prefixes:
             turtle_data += f"@prefix {prefix}: <{self.prefixes.get(prefix)}> . \n"
-        mask = (df_triples['certainty'] == 1) & (df_triples['model'].isna())
+        mask = (df_triples['weight'] == 1) & (df_triples['model'].isna())
         df_triples['certain_triple'] = ""
         df_triples.loc[mask, 'certain_triple'] = df_triples['s'] + " " + df_triples['p'] + " " + df_triples['o'] + " . \n"
         turtle_data += df_triples['certain_triple'].str.cat(sep="")
         df_triples = df_triples[~mask].copy()
 
-        df_triples['turtle_triple'] = "<< " + df_triples['s'] + " " + df_triples['p'] + " " + df_triples['o'] + f" >> {self.certainty_predicate} \"" + df_triples['certainty'].astype('string') + "\"^^xsd:decimal"
+        df_triples['turtle_triple'] = "<< " + df_triples['s'] + " " + df_triples['p'] + " " + df_triples['o'] + f" >> {self.weight_predicate} \"" + df_triples['weight'].astype('string') + "\"^^xsd:decimal"
         df_triples.loc[~df_triples['model'].isna(), 'turtle_triple'] = "<< " + df_triples['turtle_triple'] + f" >> {self.model_predicate} \"" + df_triples['model'] + "\" . \n"
         df_triples.loc[df_triples['model'].isna(), 'turtle_triple'] = df_triples['turtle_triple'] + " . \n"
         turtle_data += df_triples['turtle_triple'].str.cat(sep="")

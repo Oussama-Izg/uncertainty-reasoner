@@ -60,7 +60,7 @@ def sparql_test_sparql_star():
 
 
 def reasoner_test_aggregation_mean():
-    #sparql_test_sparql_star()
+    sparql_test_sparql_star()
     conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
                                                "http://localhost:3030/test/update",
                                                "http://localhost:3030/test/data")
@@ -70,8 +70,8 @@ def reasoner_test_aggregation_mean():
 
     reasoner = Reasoner.Reasoner(axioms)
     reasoner.load_data_from_endpoint(conn)
-    df = reasoner.reason()
-
+    reasoner.reason()
+    df = reasoner.get_triples_as_df()
     print(df[df['model'] == 'uncertainty_reasoner'])
 
 def test_AFE_DST_usecase_data():
@@ -89,8 +89,8 @@ def test_AFE_DST_usecase_data():
 
     reasoner = Reasoner.Reasoner(axioms)
     reasoner.load_data_from_endpoint(conn)
-
-    print(reasoner.reason())
+    reasoner.reason()
+    print(reasoner.get_triples_as_df())
 
 def test_AFE_DST_real_data():
     df_afe = pd.read_csv('afe_input.csv')
@@ -109,7 +109,8 @@ def test_AFE_DST_real_data():
     reasoner = Reasoner.Reasoner(axioms)
     reasoner.load_data_from_endpoint(conn)
 
-    reasoner.reason().to_csv('output.csv')
+    reasoner.reason()
+    reasoner.get_triples_as_df().to_csv('output.csv')
 
 if __name__ == '__main__':
-    test_AFE_DST_real_data()
+    reasoner_test_aggregation_mean()

@@ -26,7 +26,7 @@ def generate_vague_similarity_data(n, n_models):
         df['s'] = "ex:cn_type_" + df['s'].astype('string')
         df['o'] = "ex:cn_type_" + df['o'].astype('string')
         df['p'] = "ex:similarTo"
-        df['certainty'] = np.round(np.random.rand(df.shape[0]), decimals=2)
+        df['weight'] = np.round(np.random.rand(df.shape[0]), decimals=2)
         df['model'] = 'ex:model_' + str(model_nr)
         result = pd.concat([result, df])
     return result.reset_index(drop=True)
@@ -48,7 +48,7 @@ def generate_similarity_data(lb, ub):
     df['s'] = "ex:cn_type_" + df['s'].astype('string')
     df['o'] = "ex:cn_type_" + df['o'].astype('string')
     df['p'] = "ex:similarTo"
-    df['certainty'] = 1
+    df['weight'] = 1
 
     return df
 
