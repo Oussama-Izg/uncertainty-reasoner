@@ -59,7 +59,7 @@ class SparqlBaseConnector(ABC):
             raise Exception(f"Failed to query data: {response.reason}")
         return pd.read_csv(io.StringIO(response.text))
 
-    def delete_query(self, query: str = None, delete_all: str = False) -> None:
+    def delete_query(self, query: str = None, delete_all: bool = False) -> None:
         """
         Send a delete query to the update endpoint
         :param query: Optional custom query
@@ -107,9 +107,9 @@ class SparqlBaseConnector(ABC):
         :param query: Custom query
         :return: Triples and class dataframe in internal format
         """
-        return self.get_classes(self._apply_prefixes(self.read_into_df(query)))
+        return self._get_classes(self._apply_prefixes(self.read_into_df(query)))
 
-    def get_classes(self, df_triples: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def _get_classes(self, df_triples: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Extract class declaration from triples dataframe
         :param df_triples: Dataframe in internal format
@@ -158,8 +158,9 @@ class SparqlBaseConnector(ABC):
 
 class ReificationSparqlConnector(SparqlBaseConnector):
     """
-    SparqlConnector that implements a generic refication approach to model weight values
+    SparqlConnector that implements a generic reification approach to model weight values
     """
+
     def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None):
         super().__init__(query_endpoint, update_endpoint, gsp_endpoint, prefixes)
 
@@ -212,7 +213,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         df_triples['object_turtle'] = "_:" + df_triples['index'].astype('string') + " rdf:object " + df_triples[
             'o'] + " . \n"
         df_triples['weight_turtle'] = "_:" + df_triples['index'].astype('string') + f" {self._weight_predicate} \"" + \
-                                         df_triples['weight'].astype('string') + "\"^^xsd:decimal . \n"
+                                      df_triples['weight'].astype('string') + "\"^^xsd:decimal . \n"
         # Optional model values
         df_triples['model_turtle'] = ""
         df_triples.loc[~df_triples['model'].isna(), 'model_turtle'] = "_:" + df_triples['index'].astype(
@@ -228,8 +229,9 @@ class ReificationSparqlConnector(SparqlBaseConnector):
 
 class SparqlStarConnector(SparqlBaseConnector):
     """
-    SparqlConnector that implements a RDF-star to model weight values
+    SparqlConnector that implements RDF-star to model weight values
     """
+
     def __init__(self, query_endpoint, update_endpoint, gsp_endpoint, prefixes=None):
         super().__init__(query_endpoint, update_endpoint, gsp_endpoint, prefixes)
 
