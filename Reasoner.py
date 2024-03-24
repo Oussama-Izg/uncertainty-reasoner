@@ -35,7 +35,7 @@ class Reasoner:
     def load_data_from_endpoint(self, conn: SparqlBaseConnector, query=None):
         logger.info("Querying data")
         start = time.time()
-        self._df_triples, self._df_classes = conn.read_into_df(query=query)
+        self._df_triples, self._df_classes = conn.download_df(query=query)
         self._df_triples['weight'] = self._df_triples['weight'].fillna(1.0)
         end = time.time()
         logger.info(f"Done in {round(end - start, 3)} seconds. Queried {self._df_triples.shape[0]} rows.")
