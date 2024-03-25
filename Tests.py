@@ -15,7 +15,7 @@ def sparql_test_reification():
 
     logger.info("Generating data")
     df1 = DataGenerator.generate_vague_similarity_data(1000, 3)
-    df2 = DataGenerator.generate_similarity_data(1001, 2000)
+    df2 = DataGenerator.generate_precise_certain_data(1000)
     df = pd.concat([df1, df2]).reset_index(drop=True)
 
     logger.info("Deleting old data")
@@ -40,7 +40,7 @@ def sparql_test_sparql_star():
 
     logger.info("Generating data")
     df1 = DataGenerator.generate_vague_similarity_data(1000, 3)
-    df2 = DataGenerator.generate_similarity_data(1001, 2000)
+    df2 = DataGenerator.generate_precise_certain_data(1000)
     df = pd.concat([df1, df2]).reset_index(drop=True)
 
     logger.info("Deleting old data")
