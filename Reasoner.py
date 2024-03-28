@@ -160,15 +160,15 @@ class UncertaintyAssignmentAxiom (Axiom):
         df_selected_triples = df_triples[df_triples['p'] == self.predicate].copy()
         df_triples = df_triples[df_triples['p'] != self.predicate]
         df_agg = df_selected_triples[df_selected_triples['o'] != self.uncertainty_object].copy()
-        df_agg = df_agg.groupby(['s', 'p'])[['o']]
+        df_agg = df_agg.groupby(['s', 'p', 'model'])[['o']]
         df_agg = df_agg.count()
 
         df_agg = df_agg.reset_index()
         df_agg = df_agg.rename(columns={'o': 'count'})
 
-        df_selected_triples = pd.merge(df_selected_triples, df_agg, on=['s', 'p'])
-        df_selected_triples = pd.merge(df_selected_triples, df_selected_triples[df_selected_triples['o'] == self.uncertainty_object][['s', 'p']],
-                                       on=['s', 'p'], how='left', indicator=True)
+        df_selected_triples = pd.merge(df_selected_triples, df_agg, on=['s', 'p', 'model'])
+        df_selected_triples = pd.merge(df_selected_triples, df_selected_triples[df_selected_triples['o'] == self.uncertainty_object][['s', 'p', 'model']],
+                                       on=['s', 'p', 'model'], how='left', indicator=True)
         df_selected_triples['weight'] = 1 / df_selected_triples['count']
         df_selected_triples.loc[df_selected_triples['_merge'] == 'both', 'weight'] = (1 - self.default_uncertainty) / df_selected_triples['count']
         df_selected_triples.loc[df_selected_triples['o'] == self.uncertainty_object, 'weight'] = self.default_uncertainty
