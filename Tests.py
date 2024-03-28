@@ -95,6 +95,29 @@ def test_DST_axiom():
     reasoner.reason()
     print(reasoner.get_triples_as_df())
 
+def test_DST_axiom_handcrafted_data():
+    logger.info("Generating data")
+    df_dst_input = pd.read_csv('data/dst_test.csv')
+
+    conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
+                                               "http://localhost:3030/test/update",
+                                               "http://localhost:3030/test/data")
+    logger.info("Deleting old data")
+    conn.delete_query(delete_all=True)
+    logger.info("Uploading data")
+    conn.upload_df(df_dst_input)
+    axioms = [
+        Reasoner.UncertaintyAssignmentAxiom("ex:coinType"),
+        Reasoner.DempsterShaferAxiom("ex:coinType")
+    ]
+
+    reasoner = Reasoner.Reasoner(axioms)
+    reasoner.load_data_from_endpoint(conn)
+    reasoner.reason()
+    print(reasoner.get_triples_as_df())
+
+
+
 
 def test_AFE_DST_usecase_data():
     df_afe = pd.read_csv('afe_test_data.csv')
@@ -115,7 +138,7 @@ def test_AFE_DST_usecase_data():
     print(reasoner.get_triples_as_df())
 
 def test_AFE_DST_real_data():
-    df_afe = pd.read_csv('afe_input.csv')
+    df_afe = pd.read_csv('data/afe_input.csv')
     #df_afe = pd.read_csv('test.csv')
     conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
                                                "http://localhost:3030/test/update",
@@ -135,4 +158,4 @@ def test_AFE_DST_real_data():
     reasoner.get_triples_as_df().to_csv('output.csv')
 
 if __name__ == '__main__':
-    test_DST_axiom()
+    test_DST_axiom_handcrafted_data()
