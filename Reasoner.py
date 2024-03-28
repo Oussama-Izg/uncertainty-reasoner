@@ -197,19 +197,20 @@ class DempsterShaferAxiom(Axiom):
             joint_mass_function = None
             if df_subsets['model'].drop_duplicates().shape[0] == 1:
                 result = pd.concat([result, df_subsets])
+                continue
 
             for j, model in df_subsets['model'].drop_duplicates().items():
                 df_model_subsets = df_subsets[df_subsets['model'] == model]
 
-                issuer_ignorance = self.ignorance
+                ignorance = self.ignorance
                 df_ignorance = df_model_subsets[df_model_subsets['o'] == self.ignorance_object]
                 if df_ignorance.shape[0] == 1:
-                    issuer_ignorance += df_ignorance['weight'].iloc[0]
+                    ignorance += df_ignorance['weight'].iloc[0]
                 df_model_subsets = df_model_subsets[df_model_subsets['o'] != self.ignorance_object]
                 if joint_mass_function is None:
-                    joint_mass_function = MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance))
+                    joint_mass_function = MassFunction(self._df_to_subset(df_model_subsets, ignorance))
                 else:
-                    joint_mass_function = joint_mass_function.join_masses(MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance)))
+                    joint_mass_function = joint_mass_function.join_masses(MassFunction(self._df_to_subset(df_model_subsets, ignorance)))
 
             mass_values = joint_mass_function.get_mass_values()
             result_tmp = {
