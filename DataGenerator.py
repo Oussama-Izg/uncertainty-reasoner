@@ -67,7 +67,7 @@ def generate_precise_certain_data(n):
     return df
 
 
-def generate_dst_input_data(n, n_coin_types, n_models, uncertainty_object):
+def generate_dst_input_data(n, n_coin_types, n_models, uncertainty_object="ex:uncertain"):
     """
     Generates input data for the DempsterShaferAxiom. Each coin has 5 possible coin types that the experts could choose.
     The experts choose up to three each.

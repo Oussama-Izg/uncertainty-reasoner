@@ -13,7 +13,7 @@ class SparqlBaseConnector(ABC):
     """
 
     def __init__(self, query_endpoint: str, update_endpoint: str, gsp_endpoint: str, prefixes: dict[str, str] = None,
-                 weight_predicate: str = "ex:certaintyValue", model_predicate: str = "ex:accordingTo",
+                 weight_predicate: str = "ex:weight", model_predicate: str = "ex:accordingTo",
                  class_predicate: str = "rdf:type"):
         """
         :param query_endpoint: Query endpoint url
@@ -197,7 +197,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         for prefix in self._prefixes:
             turtle_data += f"@prefix {prefix}: <{self._prefixes.get(prefix)}> . \n"
 
-        # Certain triples
+        # Certain/precise triples
         mask = (df_triples['weight'] == 1) & (df_triples['model'].isna())
         df_triples['certain_triple'] = ""
         df_triples.loc[mask, 'certain_triple'] = df_triples['s'] + " " + df_triples['p'] + " " + df_triples[
@@ -268,7 +268,7 @@ class SparqlStarConnector(SparqlBaseConnector):
         for prefix in self._prefixes:
             turtle_data += f"@prefix {prefix}: <{self._prefixes.get(prefix)}> . \n"
 
-        # Certain triples
+        # Certain/precise triples
         mask = (df_triples['weight'] == 1) & (df_triples['model'].isna())
         df_triples['certain_triple'] = ""
         df_triples.loc[mask, 'certain_triple'] = df_triples['s'] + " " + df_triples['p'] + " " + df_triples[

@@ -61,7 +61,7 @@ class Reasoner:
             logger.info(f"Starting preprocessing.")
             start_postprocessing = time.time()
             for axiom in self._preprocessing_axioms:
-                self._df_triples = axiom.reason(self._df_triples, self._df_classes)
+                self._df_triples = axiom.reason(self._df_triples, self._df_classes).reset_index(drop=True)
                 self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
             end_postprocessing = time.time()
 
@@ -98,7 +98,6 @@ class Reasoner:
 
     def get_triples_as_df(self):
         return self._df_triples
-
 
     def save_data_to_file(self, file_name, conn: SparqlBaseConnector, only_new: bool = False):
         with open(file_name, "rw") as f:
@@ -189,26 +188,36 @@ class DempsterShaferAxiom(Axiom):
     def reason(self, df_triples: pd.DataFrame, df_classes):
         df_selected_triples = df_triples[(df_triples['p'] == self.predicate)].copy()
         result = pd.DataFrame()
-        for i, s in df_selected_triples['s'].drop_duplicates().items():
+        df_selected_subjects = df_selected_triples['s'].drop_duplicates().reset_index(drop=True)
+        n = df_selected_subjects.shape[0]
+        for i, s in df_selected_subjects.items():
+            if (i+1) % 1000 == 0:
+                logger.info(f"Processed {i+1}/{n} subjects")
             df_subsets = df_selected_triples[df_selected_triples['s'] == s]
-            joinT_mass_function = None
-            if len(df_subsets['model'].drop_duplicates().items()) == 1:
+            joint_mass_function = None
+            if df_subsets['model'].drop_duplicates().shape[0] == 1:
                 result = pd.concat([result, df_subsets])
 
             for j, model in df_subsets['model'].drop_duplicates().items():
-                df_model_subsets = df_selected_triples[df_selected_triples['model'] == model]
+                df_model_subsets = df_subsets[df_subsets['model'] == model]
 
                 issuer_ignorance = self.ignorance
                 df_ignorance = df_model_subsets[df_model_subsets['o'] == self.ignorance_object]
                 if df_ignorance.shape[0] == 1:
                     issuer_ignorance += df_ignorance['weight'].iloc[0]
                 df_model_subsets = df_model_subsets[df_model_subsets['o'] != self.ignorance_object]
-                if joinT_mass_function is None:
-                    joinT_mass_function = MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance))
+                if joint_mass_function is None:
+                    joint_mass_function = MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance))
                 else:
-                    joinT_mass_function = joinT_mass_function.join_masses(MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance)))
+                    joint_mass_function = joint_mass_function.join_masses(MassFunction(self._df_to_subset(df_model_subsets, issuer_ignorance)))
 
-            mass_values = joinT_mass_function.get_mass_values()
+            mass_values = joint_mass_function.get_mass_values()
+            result_tmp = {
+                's': [],
+                'p': [],
+                'o': [],
+                'weight': []
+            }
             for issuer in mass_values:
                 if issuer == "*":
                     result_tmp['s'].append(s)
@@ -226,19 +235,12 @@ class DempsterShaferAxiom(Axiom):
         df_triples = pd.concat([df_triples[df_triples['p'] != self.predicate], result])
         return df_triples
 
-    def _df_to_subset(self, df: pd.DataFrame, ignorance=None):
+    def _df_to_subset(self, df: pd.DataFrame, ignorance):
         result = {}
-        if ignorance is None:
-            for i, x in df.iterrows():
-                if x['o'] == self.ignorance_object:
-                    result['*'] = x['weight']
-                else:
-                    result[x['o']] = x['weight']
-        else:
-            certainty = (1 - ignorance) / df.shape[0]
-            result['*'] = ignorance
-            for i, x in df.iterrows():
-                result[x['o']] = certainty
+        certainty = (1 - ignorance) / df.shape[0]
+        result['*'] = ignorance
+        for i, x in df.iterrows():
+            result[x['o']] = certainty
         return result
 
 
@@ -304,19 +306,12 @@ class AFEDempsterShaferAxiom(Axiom):
         df_triples = pd.concat([df_triples[df_triples['p'] != self.issuer_predicate], result])
         return df_triples
 
-    def _df_to_subset(self, df: pd.DataFrame, ignorance=None):
+    def _df_to_subset(self, df: pd.DataFrame, ignorance):
         result = {}
-        if ignorance is None:
-            for i, x in df.iterrows():
-                if x['o'] == self.ignorance_object:
-                    result['*'] = x['weight']
-                else:
-                    result[x['o']] = x['weight']
-        else:
-            certainty = (1 - ignorance) / df.shape[0]
-            result['*'] = ignorance
-            for i, x in df.iterrows():
-                result[x['o']] = certainty
+        certainty = (1 - ignorance) / df.shape[0]
+        result['*'] = ignorance
+        for i, x in df.iterrows():
+            result[x['o']] = certainty
         return result
 
 

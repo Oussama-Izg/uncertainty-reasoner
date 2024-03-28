@@ -8,14 +8,14 @@ import pandas as pd
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
-def sparql_test_reification():
+def sparql_test_reification(n=1000):
     conn = SparqlConnector.ReificationSparqlConnector("http://localhost:3030/test/query",
                                                "http://localhost:3030/test/update",
                                                "http://localhost:3030/test/data")
 
     logger.info("Generating data")
-    df1 = DataGenerator.generate_vague_similarity_data(1000, 3)
-    df2 = DataGenerator.generate_precise_certain_data(1000)
+    df1 = DataGenerator.generate_vague_similarity_data(n, 3)
+    df2 = DataGenerator.generate_precise_certain_data(n)
     df = pd.concat([df1, df2]).reset_index(drop=True)
 
     logger.info("Deleting old data")
@@ -28,19 +28,19 @@ def sparql_test_reification():
     logger.info(f"Done in {end - start} seconds. Inserted {df.shape[0]} rows.")
     logger.info("Querying data")
     start = time.time()
-    count = conn.read_into_df()[0].shape[0]
+    count = conn.download_df()[0].shape[0]
     end = time.time()
     # 23.52 1498500
     logger.info(f"Done in {end - start} seconds. Queried {count} rows.")
 
-def sparql_test_sparql_star():
+def sparql_test_sparql_star(n=1000):
     conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
                                                "http://localhost:3030/test/update",
                                                "http://localhost:3030/test/data")
 
     logger.info("Generating data")
-    df1 = DataGenerator.generate_vague_similarity_data(1000, 3)
-    df2 = DataGenerator.generate_precise_certain_data(1000)
+    df1 = DataGenerator.generate_vague_similarity_data(n, 3)
+    df2 = DataGenerator.generate_precise_certain_data(n)
     df = pd.concat([df1, df2]).reset_index(drop=True)
 
     logger.info("Deleting old data")
@@ -53,7 +53,7 @@ def sparql_test_sparql_star():
     logger.info(f"Done in {end - start} seconds. Inserted {df.shape[0]} rows.")
     logger.info("Querying data")
     start = time.time()
-    count = conn.read_into_df()[0].shape[0]
+    count = conn.download_df()[0].shape[0]
     end = time.time()
     # 23.52 1498500
     logger.info(f"Done in {end - start} seconds. Queried {count} rows.")
@@ -73,6 +73,28 @@ def reasoner_test_aggregation_mean():
     reasoner.reason()
     df = reasoner.get_triples_as_df()
     print(df[df['model'] == 'uncertainty_reasoner'])
+
+def test_DST_axiom():
+    logger.info("Generating data")
+    df_dst_input = DataGenerator.generate_dst_input_data(50000, 1000, 3)
+
+    conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
+                                               "http://localhost:3030/test/update",
+                                               "http://localhost:3030/test/data")
+    logger.info("Deleting old data")
+    conn.delete_query(delete_all=True)
+    logger.info("Uploading data")
+    conn.upload_df(df_dst_input)
+    axioms = [
+        Reasoner.UncertaintyAssignmentAxiom("ex:coinType"),
+        Reasoner.DempsterShaferAxiom("ex:coinType")
+    ]
+
+    reasoner = Reasoner.Reasoner(axioms)
+    reasoner.load_data_from_endpoint(conn)
+    reasoner.reason()
+    print(reasoner.get_triples_as_df())
+
 
 def test_AFE_DST_usecase_data():
     df_afe = pd.read_csv('afe_test_data.csv')
@@ -113,4 +135,4 @@ def test_AFE_DST_real_data():
     reasoner.get_triples_as_df().to_csv('output.csv')
 
 if __name__ == '__main__':
-    reasoner_test_aggregation_mean()
+    test_DST_axiom()
