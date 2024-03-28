@@ -415,18 +415,34 @@ class ChainRuleAxiom(Axiom):
 
 
 class DisjointAxiom(Axiom):
-    def __init__(self, predicate1, predicate2):
+    def __init__(self, predicate1, predicate2, throw_exception=True, keep_predicate1=True):
         super().__init__("rule_based_reasoning")
         self.predicate1 = predicate1
         self.predicate2 = predicate2
+        self.throw_exception = throw_exception
+        self.keep_predicate1 = keep_predicate1
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
-        df_tmp = df_triples[(df_triples['p'] == self.predicate1) | (df_triples['p'] == self.predicate2)].groupby(['s', 'o'])['p'].count()
-        df_tmp = df_tmp.reset_index()
+        if self.throw_exception:
+            df_tmp = df_triples[(df_triples['p'] == self.predicate1) | (df_triples['p'] == self.predicate2)].groupby(['s', 'o'])['p'].count()
+            df_tmp = df_tmp.reset_index()
 
-        if (df_tmp['o'] != 1).any():
-            raise ConstraintException(f"Constraint violation for predicates {self.predicate1} and {self.predicate2}")
+            if (df_tmp['o'] != 1).any():
+                raise ConstraintException(f"Constraint violation for predicates {self.predicate1} and {self.predicate2}")
+        else:
+            df_predicate1 = df_triples[(df_triples['p'] == self.predicate1)]
+            df_predicate2 = df_triples[(df_triples['p'] == self.predicate2)]
 
+            df_triples = df_triples[(df_triples['p'] != self.predicate1) | (df_triples['p'] != self.predicate2)]
+
+            df_tmp = pd.concat([df_predicate1, df_predicate2])
+
+            if self.keep_predicate1:
+                df_tmp = df_tmp.drop_duplicates(subset=['s', 'o'], keep='first')
+            else:
+                df_tmp = df_tmp.drop_duplicates(subset=['s', 'o'], keep='last')
+
+            df_triples = pd.concat([df_triples, df_tmp])
         return df_triples
 
 
