@@ -1,11 +1,28 @@
+import pandas as pd
+
+
 class MassFunction:
-    def __init__(self, mass_values: dict):
-        self.mass_values = mass_values
+    """
+    Implements a simpler mass function for the Dempster-Shafer-Theory. It only supports subsets with one element or all
+    elements ("*" subset).
+    """
+    def __init__(self, mass_values: dict[str, float]):
+        self._mass_values = mass_values
 
-    def get_mass_values(self):
-        return self.mass_values.copy()
+    def get_mass_values(self) -> dict[str, float]:
+        """
+        Get the mass values
+        :return: Mass value dict
+        """
+        return self._mass_values.copy()
 
-    def join_masses(self, m):
+    def join_masses(self, m: 'MassFunction') -> 'MassFunction':
+        """
+        Join two masses via the Dempster-Shafer combination rule. Only supports subsets with one element or all
+        elements ("*" subset).
+        :param m: Mass function to join with
+        :return: Joint mass function
+        """
         result = {}
         empty_set_value = 0
         mass_values1 = self.get_mass_values()
@@ -26,10 +43,24 @@ class MassFunction:
         return MassFunction(result)
 
 
-if __name__ == '__main__':
-    m1 = MassFunction({'a': 0.3, 'd': 0.3, '*': 1 - 0.6})
-    m2 = MassFunction({'a': 8/30, 'b': 8/30, 'c': 8/30, '*': 1 - 0.8})
-    m3 = MassFunction({'d': 0.4, 'e': 0.4, '*': 1 - 0.8})
+def df_to_subset(df: pd.DataFrame, ignorance: float) -> dict[str, float]:
+    """
+    Translate dataframe to a subset dict
+    :param df: The dataframe to translate
+    :param ignorance: The ignorance to use
+    :return: Subset as dict
+    """
+    result = {}
+    certainty = (1 - ignorance) / df.shape[0]
+    result['*'] = ignorance
+    for i, x in df.iterrows():
+        result[x['o']] = certainty
+    return result
 
-    print(m1.join_masses(m2).join_masses(m3).get_mass_values())
-    print(0.237+0.327+0.103+0.103+0.154+0.077)
+
+if __name__ == '__main__':
+    m1 = MassFunction({'*': 0.4, 'ex:cn_type_1': 0.3, 'ex:cn_type_2': 0.3})
+    m2 = MassFunction({'*': 0.2, 'ex:cn_type_3': 0.4, 'ex:cn_type_4': 0.4})
+    m3 = MassFunction({'*': 0.4, 'ex:cn_type_5': 0.3, 'ex:cn_type_4': 0.3})
+
+    print(m1.join_masses(m2).get_mass_values())

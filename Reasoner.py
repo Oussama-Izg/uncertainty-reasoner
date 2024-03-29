@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 import time
 
+import DempsterShafer
 from SparqlConnector import SparqlBaseConnector
 from abc import ABC, abstractmethod
 from Exceptions import ConstraintException
-from DempsterShafer import MassFunction
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,7 @@ class Reasoner:
             start_rule_reasoning = time.time()
             counter = 0
             for i in range(self._max_iterations):
+                logger.info(f"Iteration {i+1} of max {self._max_iterations} iteration")
                 counter += 1
                 df_old = self._df_triples.copy()
                 for axiom in self._rule_reasoning_axioms:
@@ -192,7 +193,7 @@ class DempsterShaferAxiom(Axiom):
         n = df_selected_subjects.shape[0]
         for i, s in df_selected_subjects.items():
             if (i+1) % 1000 == 0:
-                logger.info(f"Processed {i+1}/{n} subjects")
+                logger.info(f"DempsterShaferAxiom: Processed {i+1}/{n} subjects for {self.predicate}")
             df_subsets = df_selected_triples[df_selected_triples['s'] == s]
             joint_mass_function = None
             if df_subsets['model'].drop_duplicates().shape[0] == 1:
@@ -208,9 +209,9 @@ class DempsterShaferAxiom(Axiom):
                     ignorance += df_ignorance['weight'].iloc[0]
                 df_model_subsets = df_model_subsets[df_model_subsets['o'] != self.ignorance_object]
                 if joint_mass_function is None:
-                    joint_mass_function = MassFunction(self._df_to_subset(df_model_subsets, ignorance))
+                    joint_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_model_subsets, ignorance))
                 else:
-                    joint_mass_function = joint_mass_function.join_masses(MassFunction(self._df_to_subset(df_model_subsets, ignorance)))
+                    joint_mass_function = joint_mass_function.join_masses(DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_model_subsets, ignorance)))
 
             mass_values = joint_mass_function.get_mass_values()
             result_tmp = {
@@ -235,14 +236,6 @@ class DempsterShaferAxiom(Axiom):
         result['model'] = np.nan
         df_triples = pd.concat([df_triples[df_triples['p'] != self.predicate], result])
         return df_triples
-
-    def _df_to_subset(self, df: pd.DataFrame, ignorance):
-        result = {}
-        certainty = (1 - ignorance) / df.shape[0]
-        result['*'] = ignorance
-        for i, x in df.iterrows():
-            result[x['o']] = certainty
-        return result
 
 
 class AFEDempsterShaferAxiom(Axiom):
@@ -279,10 +272,10 @@ class AFEDempsterShaferAxiom(Axiom):
                 issuing_for_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
             df_issuing_for_subsets = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
 
-            issuer_mass_function = MassFunction(self._df_to_subset(df_issuer_subsets, issuer_ignorance))
+            issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_issuer_subsets, issuer_ignorance))
             for j, issuing_for in df_issuing_for_subsets['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
-                domain_knowledge_mass_function = MassFunction(self._df_to_subset(df_domain_knowledge_subsets, issuing_for_ignorance))
+                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_domain_knowledge_subsets, issuing_for_ignorance))
                 issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
             result_tmp = {
                 's': [],
@@ -306,14 +299,6 @@ class AFEDempsterShaferAxiom(Axiom):
             result = pd.concat([result, result_tmp])
         df_triples = pd.concat([df_triples[df_triples['p'] != self.issuer_predicate], result])
         return df_triples
-
-    def _df_to_subset(self, df: pd.DataFrame, ignorance):
-        result = {}
-        certainty = (1 - ignorance) / df.shape[0]
-        result['*'] = ignorance
-        for i, x in df.iterrows():
-            result[x['o']] = certainty
-        return result
 
 
 class NormalizationAxiom(Axiom):
@@ -352,12 +337,16 @@ class InverseAxiom(Axiom):
 
 
 class ChainRuleAxiom(Axiom):
-    def __init__(self, antecedent1, antecedent2, consequent, reasoning_logic, class_1=None, class_2=None,
-                 class_3=None):
+    def __init__(self, antecedent1, antecedent2, consequent, reasoning_logic, sum_values=False, class_1=None, class_2=None,
+                 class_3=None, input_threshold=None, output_threshold=None):
         super().__init__('rule_based_reasoning')
         self.antecedent1 = antecedent1
         self.antecedent2 = antecedent2
         self.consequent = consequent
+
+        self.input_threshold = input_threshold
+        self.output_threshold = output_threshold
+        self.sum_values = sum_values
 
         self.class1 = class_1
         self.class2 = class_2
@@ -367,49 +356,68 @@ class ChainRuleAxiom(Axiom):
         self.reasoning_logic = reasoning_logic
 
     def reason(self, df_triples, df_classes):
-        df_triples_left = df_triples[df_triples['p'] == self.antecedent1]
-        df_triples_right = df_triples[df_triples['p'] == self.antecedent2]
+        df_selected_triples = df_triples[(df_triples['p'] == self.antecedent1) |
+                                         (df_triples['p'] == self.antecedent2)].copy()
+
+        # Enforce input threshold
+        if self.input_threshold:
+            df_selected_triples = df_selected_triples[df_selected_triples['weight'] > self.input_threshold]
+
+        df_triples_left = df_selected_triples[df_selected_triples['p'] == self.antecedent1]
+        df_triples_right = df_selected_triples[df_selected_triples['p'] == self.antecedent2]
+
+        # Enforce classes by inner-merging with df_classes
         if self.class1:
             df_triples_left = pd.merge(df_triples_left, df_classes[df_classes['class'] == self.class1],
                                        right_on='s', left_on='node')
-            df_triples_left = df_triples_left.drop(columns=['node'])
-        if self.class1:
+            df_triples_left = df_triples_left.drop(columns=['class'])
+        if self.class2:
             df_triples_left = pd.merge(df_triples_left, df_classes[df_classes['class'] == self.class2],
                                        right_on='o', left_on='node')
-            df_triples_left = df_triples_left.drop(columns=['node'])
+            df_triples_left = df_triples_left.drop(columns=['class'])
             df_triples_right = pd.merge(df_triples_right, df_classes[df_classes['class'] == self.class2],
-                                       right_on='s', left_on='node')
-            df_triples_right = df_triples_right.drop(columns=['node'])
+                                        right_on='s', left_on='node')
+            df_triples_right = df_triples_right.drop(columns=['class'])
         if self.class3:
             df_triples_right = pd.merge(df_triples_right, df_classes[df_classes['class'] == self.class3],
                                         right_on='o', left_on='node')
-            df_triples_right = df_triples_right.drop(columns=['node'])
-
+            df_triples_right = df_triples_right.drop(columns=['class'])
+        # Merge antecedent triples
         df_result = pd.merge(df_triples_left, df_triples_right, left_on='o', right_on='s')
+
+        # Apply reasoning logic
         if self.reasoning_logic == 'product':
-            df_result['weight'] = df_result['certainty_x'] + df_result['certainty_y']
+            df_result['weight'] = df_result['weight_x'] * df_result['weight_y']
         elif self.reasoning_logic == 'goedel':
-            df_result['weight'] = df_result['certainty_x']
-            df_result.loc[df_result['certainty_x'] > df_result['certainty_y'], 'weight'] = df_result['certainty_y']
+            df_result['weight'] = df_result['weight_x']
+            df_result.loc[df_result['certainty_x'] > df_result['weight_y'], 'weight'] = df_result['weight_y']
         elif self.reasoning_logic == 'lukasiewicz':
-            df_result['weight'] = df_result['certainty_x'] + df_result['certainty_x'] - 1.0
+            df_result['weight'] = df_result['weight_x'] + df_result['weight_x'] - 1.0
             df_result.loc[0 > df_result['weight'], 'weight'] = 0.0
         else:
             raise ValueError("Reasoning logic must be product, goedel or lukasiewicz.")
+
         rename_dict = {
             's_x': 's',
-            's_class_x': 's_class',
             'o_y': 'o',
-            'o_class_y': 'o_class',
         }
         df_result['p'] = self.consequent
         df_result = df_result.rename(columns=rename_dict)
-        df_result = df_result[['s', 'p', 'o', 's_class', 'o_class', 'weight']]
+        df_result = df_result[['s', 'p', 'o', 'weight']]
+
+        # Sum values
+        if self.sum_values:
+            df_result = df_result.groupby(['s', 'p', 'o']).agg({'weight': 'sum'}).reset_index()
+
+        # Apply output threshold
+        if self.output_threshold:
+            df_result = df_result[df_result['weight'] > self.output_threshold]
 
         df_triples = pd.concat([df_triples, df_result])
 
+        # Only keep the triple with the highest weight
         df_triples = df_triples.sort_values(by='weight', ascending=True)
-        df_triples = df_triples.drop_duplicates(subset=['s', 'p', 'o'])
+        df_triples = df_triples.drop_duplicates(subset=['s', 'p', 'o'], keep='last')
 
         return df_triples
 
@@ -424,6 +432,7 @@ class DisjointAxiom(Axiom):
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
         if self.throw_exception:
+            # There should not be both predicates for the same s,o combination
             df_tmp = df_triples[(df_triples['p'] == self.predicate1) | (df_triples['p'] == self.predicate2)].groupby(['s', 'o'])['p'].count()
             df_tmp = df_tmp.reset_index()
 
@@ -433,10 +442,11 @@ class DisjointAxiom(Axiom):
             df_predicate1 = df_triples[(df_triples['p'] == self.predicate1)]
             df_predicate2 = df_triples[(df_triples['p'] == self.predicate2)]
 
-            df_triples = df_triples[(df_triples['p'] != self.predicate1) | (df_triples['p'] != self.predicate2)]
+            df_triples = df_triples[(df_triples['p'] != self.predicate1) & (df_triples['p'] != self.predicate2)]
 
             df_tmp = pd.concat([df_predicate1, df_predicate2])
 
+            # Only keep one of the predicates
             if self.keep_predicate1:
                 df_tmp = df_tmp.drop_duplicates(subset=['s', 'o'], keep='first')
             else:
@@ -457,4 +467,3 @@ class SelfDisjointAxiom(Axiom):
             raise ConstraintException(f"Constraint violation for predicate {self.predicate}")
 
         return df_triples
-

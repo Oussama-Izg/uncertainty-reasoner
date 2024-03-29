@@ -100,7 +100,7 @@ def generate_dst_input_data(n, n_coin_types, n_models, uncertainty_object="ex:un
                 result_from.append("ex:coin_" + str(i))
                 result_to.append("ex:cn_type_" + str(choices[j]))
                 model.append("ex:model_" + str(m))
-            # Probability for the uncertain checkbox to indicate a uncertain selection
+            # Probability for the uncertain checkbox to indicate an uncertain checkbox selection
             if np.random.rand() < 0.2:
                 result_from.append("ex:coin_" + str(i))
                 result_to.append(uncertainty_object)

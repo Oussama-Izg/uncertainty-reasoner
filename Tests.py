@@ -33,6 +33,7 @@ def sparql_test_reification(n=1000):
     # 23.52 1498500
     logger.info(f"Done in {end - start} seconds. Queried {count} rows.")
 
+
 def sparql_test_sparql_star(n=1000):
     conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
                                                "http://localhost:3030/test/update",
@@ -74,6 +75,7 @@ def reasoner_test_aggregation_mean():
     df = reasoner.get_triples_as_df()
     print(df[df['model'] == 'uncertainty_reasoner'])
 
+
 def test_DST_axiom():
     logger.info("Generating data")
     df_dst_input = DataGenerator.generate_dst_input_data(50000, 1000, 3)
@@ -94,6 +96,7 @@ def test_DST_axiom():
     reasoner.load_data_from_endpoint(conn)
     reasoner.reason()
     print(reasoner.get_triples_as_df())
+
 
 def test_DST_axiom_handcrafted_data():
     logger.info("Generating data")
@@ -117,8 +120,6 @@ def test_DST_axiom_handcrafted_data():
     print(reasoner.get_triples_as_df())
 
 
-
-
 def test_AFE_DST_usecase_data():
     df_afe = pd.read_csv('afe_test_data.csv')
     conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
@@ -136,6 +137,7 @@ def test_AFE_DST_usecase_data():
     reasoner.load_data_from_endpoint(conn)
     reasoner.reason()
     print(reasoner.get_triples_as_df())
+
 
 def test_AFE_DST_real_data():
     df_afe = pd.read_csv('data/afe_input.csv')
@@ -157,5 +159,56 @@ def test_AFE_DST_real_data():
     reasoner.reason()
     reasoner.get_triples_as_df().to_csv('output.csv')
 
+
+def test_chain_rule_handcrafted():
+    df_chain_rule = pd.read_csv('data/chain_rule_test.csv')
+    conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
+                                               "http://localhost:3030/test/update",
+                                               "http://localhost:3030/test/data")
+    conn.delete_query(delete_all=True)
+    conn.upload_df(df_chain_rule)
+    axioms = [
+        Reasoner.ChainRuleAxiom('ex:coinType', 'ex:similarTo', 'ex:similarTo',
+                                'product', sum_values=True),
+        Reasoner.DisjointAxiom('ex:coinType', 'ex:similarTo', throw_exception=False)
+    ]
+
+    reasoner = Reasoner.Reasoner(axioms)
+    reasoner.load_data_from_endpoint(conn)
+
+    reasoner.reason()
+    reasoner.get_triples_as_df().to_csv('output.csv')
+
+
+def test_chain_rule():
+    logger.info("Generating ex:coinType data")
+    df_dst_input = DataGenerator.generate_dst_input_data(10000, 1000, 3)
+    logger.info("Generating ex:similarTo data")
+    df_similarity_input = DataGenerator.generate_vague_similarity_data(1000, 3)
+    df_chain_rule = pd.concat([df_similarity_input, df_dst_input]).reset_index()
+
+    conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
+                                               "http://localhost:3030/test/update",
+                                               "http://localhost:3030/test/data")
+    logger.info("Deleting old data")
+    conn.delete_query(delete_all=True)
+    logger.info("Uploading new data")
+    conn.upload_df(df_chain_rule)
+    axioms = [
+        Reasoner.UncertaintyAssignmentAxiom("ex:coinType"),
+        Reasoner.DempsterShaferAxiom("ex:coinType"),
+        Reasoner.AggregationAxiom('ex:similarTo', 'mean'),
+        Reasoner.ChainRuleAxiom('ex:coinType', 'ex:similarTo', 'ex:similarTo',
+                                'product', sum_values=True, input_threshold=0.8),
+        Reasoner.DisjointAxiom('ex:coinType', 'ex:similarTo', throw_exception=False)
+    ]
+
+    reasoner = Reasoner.Reasoner(axioms)
+    reasoner.load_data_from_endpoint(conn)
+
+    reasoner.reason()
+    reasoner.get_triples_as_df().to_csv('output.csv')
+
+
 if __name__ == '__main__':
-    test_DST_axiom_handcrafted_data()
+    test_chain_rule()
