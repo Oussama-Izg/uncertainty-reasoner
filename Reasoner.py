@@ -66,7 +66,6 @@ class Reasoner:
             end_postprocessing = time.time()
 
             logger.info(f"Preprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
-        df_triples_with_model = self._df_triples[~self._df_triples['model'].isna()].copy()
         self._df_triples = self._df_triples[self._df_triples['model'].isna()].copy()
         if len(self._rule_reasoning_axioms) != 0:
             logger.info(f"Starting rule based reasoning.")
@@ -93,7 +92,6 @@ class Reasoner:
 
             logger.info(f"Postprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
         self._df_triples = self._compare_dataframes(df_before, self._df_triples)
-        self._df_triples = pd.concat([self._df_triples, df_triples_with_model])
         end_reasoning = time.time()
         logger.info(f"Reasoning done in {round(end_reasoning - start_reasoning, 3)} seconds.")
 
@@ -151,11 +149,11 @@ class AggregationAxiom(Axiom):
 
 
 class UncertaintyAssignmentAxiom (Axiom):
-    def __init__(self, predicate, uncertainty_object="ex:uncertain", default_uncertainty=0.2):
+    def __init__(self, predicate, uncertainty_object="ex:uncertain", uncertainty_value=0.2):
         super().__init__("preprocessing")
         self.predicate = predicate
         self.uncertainty_object = uncertainty_object
-        self.default_uncertainty = default_uncertainty
+        self.uncertainty_value = uncertainty_value
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
         df_selected_triples = df_triples[df_triples['p'] == self.predicate].copy()
@@ -171,8 +169,8 @@ class UncertaintyAssignmentAxiom (Axiom):
         df_selected_triples = pd.merge(df_selected_triples, df_selected_triples[df_selected_triples['o'] == self.uncertainty_object][['s', 'p', 'model']],
                                        on=['s', 'p', 'model'], how='left', indicator=True)
         df_selected_triples['weight'] = 1 / df_selected_triples['count']
-        df_selected_triples.loc[df_selected_triples['_merge'] == 'both', 'weight'] = (1 - self.default_uncertainty) / df_selected_triples['count']
-        df_selected_triples.loc[df_selected_triples['o'] == self.uncertainty_object, 'weight'] = self.default_uncertainty
+        df_selected_triples.loc[df_selected_triples['_merge'] == 'both', 'weight'] = (1 - self.uncertainty_value) / df_selected_triples['count']
+        df_selected_triples.loc[df_selected_triples['o'] == self.uncertainty_object, 'weight'] = self.uncertainty_value
 
         df_selected_triples = df_selected_triples.drop(columns=['count'])
 
@@ -202,16 +200,10 @@ class DempsterShaferAxiom(Axiom):
 
             for j, model in df_subsets['model'].drop_duplicates().items():
                 df_model_subsets = df_subsets[df_subsets['model'] == model]
-
-                ignorance = self.ignorance
-                df_ignorance = df_model_subsets[df_model_subsets['o'] == self.ignorance_object]
-                if df_ignorance.shape[0] == 1:
-                    ignorance += df_ignorance['weight'].iloc[0]
-                df_model_subsets = df_model_subsets[df_model_subsets['o'] != self.ignorance_object]
                 if joint_mass_function is None:
-                    joint_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_model_subsets, ignorance))
+                    joint_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_model_subsets, self.ignorance, self.ignorance_object))
                 else:
-                    joint_mass_function = joint_mass_function.join_masses(DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_model_subsets, ignorance)))
+                    joint_mass_function = joint_mass_function.join_masses(DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_model_subsets, self.ignorance, self.ignorance_object)))
 
             mass_values = joint_mass_function.get_mass_values()
             result_tmp = {
@@ -239,7 +231,7 @@ class DempsterShaferAxiom(Axiom):
 
 
 class AFEDempsterShaferAxiom(Axiom):
-    def __init__(self, issuer_predicate, issuing_for_predicate, domain_knowledge_predicate='ex:domain_knowledge', ignorance_object='ex:uncertain', ignorance=0.2):
+    def __init__(self, issuer_predicate='ex:issuer', issuing_for_predicate='ex:issuing_for', domain_knowledge_predicate='ex:domain_knowledge', ignorance_object='ex:uncertain', ignorance=0.2):
         super().__init__("preprocessing")
         self.issuer_predicate = issuer_predicate
         self.ignorance = ignorance
@@ -251,7 +243,6 @@ class AFEDempsterShaferAxiom(Axiom):
         df_domain_knowledge = df_triples[(df_triples['p'] == self.domain_knowledge_predicate)].copy()
         df_issuer = df_triples[(df_triples['p'] == self.issuer_predicate)].copy()
         df_issuing_for = df_triples[(df_triples['p'] == self.issuing_for_predicate)].copy()
-        # df_issuer = self._process_df(df_issuer)
         result = pd.DataFrame()
         for i, coin in df_issuer['s'].drop_duplicates().items():
             df_issuer_subsets = df_issuer[df_issuer['s'] == coin]
@@ -259,12 +250,7 @@ class AFEDempsterShaferAxiom(Axiom):
             if df_issuing_for_subsets.shape[0] == 0:
                 result = pd.concat([result, df_issuer_subsets])
                 continue
-
-            issuer_ignorance = self.ignorance
-            df_issuer_ignorance = df_issuer_subsets[df_issuer_subsets['o'] == self.ignorance_object]
-            if df_issuer_ignorance.shape[0] == 1:
-                issuer_ignorance += df_issuer_ignorance['weight'].iloc[0]
-            df_issuer_subsets = df_issuer_subsets[df_issuer_subsets['o'] != self.ignorance_object]
+            issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
 
             issuing_for_ignorance = self.ignorance
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
@@ -272,10 +258,9 @@ class AFEDempsterShaferAxiom(Axiom):
                 issuing_for_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
             df_issuing_for_subsets = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
 
-            issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_issuer_subsets, issuer_ignorance))
             for j, issuing_for in df_issuing_for_subsets['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
-                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset(df_domain_knowledge_subsets, issuing_for_ignorance))
+                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, issuing_for_ignorance, self.ignorance_object))
                 issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
             result_tmp = {
                 's': [],

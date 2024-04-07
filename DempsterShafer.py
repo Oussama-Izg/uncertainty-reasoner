@@ -43,18 +43,22 @@ class MassFunction:
         return MassFunction(result)
 
 
-def df_to_subset(df: pd.DataFrame, ignorance: float) -> dict[str, float]:
+def df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncertainty_object:str) -> dict[str, float]:
     """
     Translate dataframe to a subset dict
     :param df: The dataframe to translate
-    :param ignorance: The ignorance to use
+    :param default_ignorance: The ignorance to use
+    :param uncertainty_object: The uncertainty object that indicates ignorance
     :return: Subset as dict
     """
     result = {}
-    certainty = (1 - ignorance) / df.shape[0]
-    result['*'] = ignorance
+    result['*'] = default_ignorance
+    n = df[df['o'] != uncertainty_object].shape[0]
     for i, x in df.iterrows():
-        result[x['o']] = certainty
+        if x['o'] == uncertainty_object:
+            result['*'] += x['weight']
+        else:
+            result[x['o']] = x['weight'] - default_ignorance / n
     return result
 
 
