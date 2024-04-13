@@ -307,14 +307,16 @@ class NormalizationAxiom(Axiom):
 
 
 class InverseAxiom(Axiom):
-    def __init__(self, predicate):
+    def __init__(self, antecedent, inverse):
         super().__init__('rule_based_reasoning')
-        self.predicate = predicate
+        self.antecedent = antecedent
+        self.inverse = inverse
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
-        df_tmp = df_triples[df_triples['p'] == self.predicate].copy()
+        df_tmp = df_triples[df_triples['p'] == self.antecedent].copy()
         df_tmp = df_tmp.rename(columns={'s': 's_t'})
         df_tmp = df_tmp.rename(columns={'s_t': 'o', 'o': 's'})
+        df_tmp['p'] = self.inverse
         df_triples = pd.concat([df_triples, df_tmp]).sort_values(by='weight', ascending=True)
         df_triples = df_triples.drop_duplicates(subset=['s', 'p', 'o'], keep='last')
 
