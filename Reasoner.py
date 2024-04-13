@@ -442,13 +442,16 @@ class DisjointAxiom(Axiom):
 
 
 class SelfDisjointAxiom(Axiom):
-    def __init__(self, predicate):
+    def __init__(self, predicate, throw_exception=True):
         super().__init__("rule_based_reasoning")
         self.predicate = predicate
+        self.throw_exception = throw_exception
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
         df_tmp = df_triples[df_triples['p'] == self.predicate]
-        if (df_tmp['s'] == df_tmp['o']).sum() != 0:
+        if (df_tmp['s'] == df_tmp['o']).sum() != 0 and self.throw_exception:
             raise ConstraintException(f"Constraint violation for predicate {self.predicate}")
+        else:
+            df_triples = df_triples[(df_triples['p'] == self.predicate) | (df_triples['s'] != df_triples['o'])]
 
         return df_triples
