@@ -1,4 +1,6 @@
 import logging
+from typing import Literal
+
 import pandas as pd
 import numpy as np
 import time
@@ -12,7 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 class Reasoner:
-    def __init__(self, axioms, max_iterations=100, reasoner_name='uncertainty_reasoner'):
+    """
+    Reasoner for uncertain and vague RDF graphs
+    """
+    def __init__(self, axioms: list['Axiom'], max_iterations: int = 100, reasoner_name: str = 'uncertainty_reasoner'):
+        """
+        :param axioms: List of axioms for reasoning
+        :param max_iterations: Max iterations for chain rule reasoning
+        :param reasoner_name: Reasoner name for output
+        """
         self._preprocessing_axioms = []
         self._rule_reasoning_axioms = []
         self._postprocessing_axioms = []
@@ -32,7 +42,13 @@ class Reasoner:
             else:
                 raise ValueError(f"Unknown axiom type given {axiom.get_stage()}")
 
-    def load_data_from_endpoint(self, conn: SparqlBaseConnector, query=None):
+    def load_data_from_endpoint(self, conn: SparqlBaseConnector, query: str = None) -> None:
+        """
+        Load data from SPARQL endpoint
+        :param conn: SPARQL connection
+        :param query: Custom query
+        :return:
+        """
         logger.info("Querying data")
         start = time.time()
         self._df_triples, self._df_classes = conn.download_df(query=query)
@@ -40,7 +56,13 @@ class Reasoner:
         end = time.time()
         logger.info(f"Done in {round(end - start, 3)} seconds. Queried {self._df_triples.shape[0]} rows.")
 
-    def _compare_dataframes(self, df_before, df_after):
+    def _compare_dataframes(self, df_before:pd.DataFrame, df_after: pd.DataFrame) -> pd.DataFrame:
+        """
+        Compare dataframe before and after reasoning. New triples are flagged with reasoner_name as the model
+        :param df_before: Dataframe before
+        :param df_after: Dataframe after
+        :return: The resulting dataframe
+        """
         # Find rows with new values
         df_result = pd.concat([df_before, df_after]).drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).reset_index(drop=True)
         # Set reasoner name as model
@@ -53,7 +75,13 @@ class Reasoner:
 
         return df_result
 
-    def reason(self):
+    def reason(self) -> pd.DataFrame:
+        """
+        Start the reasoning process. All preprocessing axioms are applied once. The chain rule axioms are apllied until
+        the weights don't change or the maximum number of iterations is reached. Then the post-processing axioms are
+        applied once.
+        :return:
+        """
         logger.info(f"Starting reasoning.")
         start_reasoning = time.time()
         df_before = self._df_triples.copy()
@@ -95,35 +123,77 @@ class Reasoner:
         end_reasoning = time.time()
         logger.info(f"Reasoning done in {round(end_reasoning - start_reasoning, 3)} seconds.")
 
-    def get_triples_as_df(self):
+    def get_triples_as_df(self) -> pd.DataFrame:
+        """
+        Get the df_triples dataframe
+        :return: df_triples dataframe
+        """
         return self._df_triples
 
-    def save_data_to_file(self, file_name, conn: SparqlBaseConnector, only_new: bool = False):
+    def save_data_to_file(self, file_name, conn: SparqlBaseConnector, only_new: bool = False) -> None:
+        """
+        Write triples to turtle file
+        :param file_name: File name
+        :param conn: Connection to translate triples into turtle triples
+        :param only_new: Include only the new inferred triples or triple values
+        :return:
+        """
         with open(file_name, "rw") as f:
             if only_new:
-                f.write(conn.df_to_turtle(self._df_triples['model'] == self._reasoner_name))
+                f.write(conn.df_to_turtle(self._df_triples[self._df_triples['model'] == self._reasoner_name]))
             else:
                 f.write(conn.df_to_turtle(self._df_triples))
 
-    def upload_data_to_endpoint(self, conn: SparqlBaseConnector):
-        conn.upload_df(self._df_triples)
+    def upload_data_to_endpoint(self, conn: SparqlBaseConnector, only_new: bool = False) -> None:
+        """
+        Upload triple to endpoint
+        :param conn: SPARQL connection to use
+        :param only_new: Include only the new inferred triples or triple values
+        :return:
+        """
+        if only_new:
+            conn.upload_df(self._df_triples[self._df_triples['model'] == self._reasoner_name])
+        else:
+            conn.upload_df(self._df_triples)
+
 
 
 class Axiom(ABC):
-    def __init__(self, stage):
+    """
+    Abstract Axiom class to implement reasoning axioms
+    """
+    def __init__(self, stage: Literal['preprocessing', 'rule_based_reasoning', 'postprocessing']):
+        """
+        :param stage: Defines the reasoning stage: preprocessing, rule_based_reasoning or postprocessing
+        """
         self._stage = stage
 
-    def get_stage(self):
+    def get_stage(self) -> str:
+        """
+        :return: Returns the stage of the axiom
+        """
         return self._stage
 
     @abstractmethod
-    def reason(self, df_triples, df_classes):
+    def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply axiom on given triples dataframe
+        :param df_triples: Triples dataframe
+        :param df_classes: Classes dataframe
+        :return: Triples dataframe where the axiom was applied
+        """
         pass
 
 
 class AggregationAxiom(Axiom):
-
-    def __init__(self, predicate, aggregation_type):
+    """
+    Axiom to aggregate weights by model using simple aggregation functions
+    """
+    def __init__(self, predicate: str, aggregation_type: Literal["mean", "median"]):
+        """
+        :param predicate: Predicate to aggregate
+        :param aggregation_type: Aggregation type
+        """
         super().__init__("preprocessing")
         self.predicate = predicate
 
@@ -149,7 +219,15 @@ class AggregationAxiom(Axiom):
 
 
 class CertaintyAssignmentAxiom (Axiom):
+    """
+    Uses a heuristic to assign certainty weights to triples.
+    """
     def __init__(self, predicate, uncertainty_object="ex:uncertain", uncertainty_value=0.2):
+        """
+        :param predicate: The predicate to use
+        :param uncertainty_object: Object indicating uncertainty about the selection
+        :param uncertainty_value: Certainty value for the uncertainty object
+        """
         super().__init__("preprocessing")
         self.predicate = predicate
         self.uncertainty_object = uncertainty_object
@@ -178,7 +256,16 @@ class CertaintyAssignmentAxiom (Axiom):
 
 
 class DempsterShaferAxiom(Axiom):
+    """
+    Implements a simple Dempster-Shafer combination rule to combine the weights (evidences) from multiple models. Should
+    only be used for certainty weights.
+    """
     def __init__(self, predicate, ignorance_object='ex:uncertain', ignorance=0.2):
+        """
+        :param predicate: Predicate to aggregate
+        :param ignorance_object: Object that increases ignorance for the mass function
+        :param ignorance: Default ignorance
+        """
         super().__init__("preprocessing")
         self.predicate = predicate
         self.ignorance = ignorance
@@ -231,7 +318,17 @@ class DempsterShaferAxiom(Axiom):
 
 
 class AFEDempsterShaferAxiom(Axiom):
+    """
+    Use-case-specific Dempster-Shafer axiom for AFE data
+    """
     def __init__(self, issuer_predicate='ex:issuer', issuing_for_predicate='ex:issuing_for', domain_knowledge_predicate='ex:domain_knowledge', ignorance_object='ex:uncertain', ignorance=0.2):
+        """
+        :param issuer_predicate: Issuer predicate
+        :param issuing_for_predicate: Issuing for predicate
+        :param domain_knowledge_predicate: Domain knowledge predicate
+        :param ignorance_object: Object that increases ignorance for the mass function
+        :param ignorance: Default ignorance
+        """
         super().__init__("preprocessing")
         self.issuer_predicate = issuer_predicate
         self.ignorance = ignorance
@@ -287,27 +384,40 @@ class AFEDempsterShaferAxiom(Axiom):
 
 
 class NormalizationAxiom(Axiom):
-    def __init__(self, predicate):
+    """
+    Normalizes the weights by model to sum up to one
+    """
+    def __init__(self, predicate: str):
+        """
+        :param predicate: Predicate to normalize
+        """
         super().__init__("postprocessing")
         self.predicate = predicate
 
     def reason(self, df_triples: pd.DataFrame, df_classes):
         df_agg = df_triples[df_triples['p'] == self.predicate].copy()
-        df_agg = df_agg.groupby(['s', 'p', 'o'])[['weight']]
+        df_agg = df_agg.groupby(['s', 'p', 'o', 'model'])[['weight']]
         df_agg = df_agg.sum()
 
         df_agg = df_agg.reset_index()
         df_agg = df_agg.rename(columns={'weight': 'sum'})
 
-        df_triples = pd.merge(df_triples, df_agg, on=['s', 'p', 'o'])
-        df_triples['weight'] = 1 / df_triples['sum']
+        df_triples = pd.merge(df_triples, df_agg, on=['s', 'p', 'o', 'model'])
+        df_triples['weight'] = df_triples['weight'] / df_triples['sum']
         df_triples = df_triples.drop(columns=['sum'])
 
         return df_triples
 
 
 class InverseAxiom(Axiom):
-    def __init__(self, antecedent, inverse):
+    """
+    Defines the inverse of predicates. The inverse of an antecedent has the same weight as the antecedent.
+    """
+    def __init__(self, antecedent: str, inverse: str):
+        """
+        :param antecedent: Antecedent predicate
+        :param inverse: Inverse predicate
+        """
         super().__init__('rule_based_reasoning')
         self.antecedent = antecedent
         self.inverse = inverse
@@ -324,8 +434,24 @@ class InverseAxiom(Axiom):
 
 
 class ChainRuleAxiom(Axiom):
-    def __init__(self, antecedent1, antecedent2, consequent, reasoning_logic, sum_values=False, class_1=None, class_2=None,
+    """
+    Implements a modified version of the chain rule axiom from the Academic Meta Tool.
+    """
+    def __init__(self, antecedent1, antecedent2, consequent, reasoning_logic: Literal['product', 'goedel', 'lukasiewicz'], sum_values=False, class_1=None, class_2=None,
                  class_3=None, input_threshold=None, output_threshold=None):
+        """
+
+        :param antecedent1: First antecedent predicate: A antecedent1 B
+        :param antecedent2: Second antecedent predicate: B antecedent2 C
+        :param consequent: Consequent predicate: A consequent C
+        :param reasoning_logic: Reasoning logic to use
+        :param sum_values: Sum values of viable paths
+        :param class_1: Optional class constraint for node A
+        :param class_2: Optional class constraint for node B
+        :param class_3: Optional class constraint for node C
+        :param input_threshold: Optional input threshold for weights
+        :param output_threshold: Optional output threshold for weights
+        """
         super().__init__('rule_based_reasoning')
         self.antecedent1 = antecedent1
         self.antecedent2 = antecedent2
@@ -410,7 +536,16 @@ class ChainRuleAxiom(Axiom):
 
 
 class DisjointAxiom(Axiom):
+    """
+    Axiom to add a constraint that disallows two predicate to have the same subject and object.
+    """
     def __init__(self, predicate1, predicate2, throw_exception=True, keep_predicate1=True):
+        """
+        :param predicate1: First predicate
+        :param predicate2: Second predicate
+        :param throw_exception: Throw exception or just remove one of the triples?
+        :param keep_predicate1: Keep predicate1 or predicate2?
+        """
         super().__init__("rule_based_reasoning")
         self.predicate1 = predicate1
         self.predicate2 = predicate2
@@ -444,7 +579,15 @@ class DisjointAxiom(Axiom):
 
 
 class SelfDisjointAxiom(Axiom):
+    """
+    Constraint axiom to disallow self-referencing for a given predicate
+    """
     def __init__(self, predicate, throw_exception=True):
+        """
+
+        :param predicate: Predicate to disallow self-referencing for
+        :param throw_exception: Throw exception or just remove the triples?
+        """
         super().__init__("rule_based_reasoning")
         self.predicate = predicate
         self.throw_exception = throw_exception
