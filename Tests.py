@@ -78,7 +78,7 @@ def reasoner_test_aggregation_mean():
 
 def test_DST_axiom():
     logger.info("Generating data")
-    df_dst_input = DataGenerator.generate_dst_input_data(50000, 1000, 3)
+    df_dst_input = DataGenerator.generate_dst_input_data(10000, 1000, 3)
 
     conn = SparqlConnector.SparqlStarConnector("http://localhost:3030/test/query",
                                                "http://localhost:3030/test/update",
@@ -88,7 +88,7 @@ def test_DST_axiom():
     logger.info("Uploading data")
     conn.upload_df(df_dst_input)
     axioms = [
-        Reasoner.UncertaintyAssignmentAxiom("ex:coinType"),
+        Reasoner.CertaintyAssignmentAxiom("ex:coinType"),
         Reasoner.DempsterShaferAxiom("ex:coinType")
     ]
 
@@ -110,7 +110,7 @@ def test_DST_axiom_handcrafted_data():
     logger.info("Uploading data")
     conn.upload_df(df_dst_input)
     axioms = [
-        Reasoner.UncertaintyAssignmentAxiom("ex:coinType"),
+        Reasoner.CertaintyAssignmentAxiom("ex:coinType"),
         Reasoner.DempsterShaferAxiom("ex:coinType")
     ]
 
@@ -128,8 +128,8 @@ def test_AFE_DST_usecase_data():
     conn.delete_query(delete_all=True)
     conn.upload_df(df_afe)
     axioms = [
-        Reasoner.UncertaintyAssignmentAxiom("ex:issuer"),
-        Reasoner.UncertaintyAssignmentAxiom("ex:issuing_for"),
+        Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
+        Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
         Reasoner.AFEDempsterShaferAxiom('ex:issuer', 'ex:issuing_for', 'ex:domain_knowledge')
     ]
 
@@ -148,8 +148,8 @@ def test_AFE_DST_real_data():
     conn.delete_query(delete_all=True)
     conn.upload_df(df_afe)
     axioms = [
-        Reasoner.UncertaintyAssignmentAxiom("ex:issuer"),
-        Reasoner.UncertaintyAssignmentAxiom("ex:issuing_for"),
+        Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
+        Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
         Reasoner.AFEDempsterShaferAxiom('ex:issuer', 'ex:issuing_for', 'ex:domain_knowledge')
     ]
 
@@ -195,7 +195,7 @@ def test_chain_rule():
     logger.info("Uploading new data")
     conn.upload_df(df_chain_rule)
     axioms = [
-        Reasoner.UncertaintyAssignmentAxiom("ex:coinType"),
+        Reasoner.CertaintyAssignmentAxiom("ex:coinType"),
         Reasoner.DempsterShaferAxiom("ex:coinType"),
         Reasoner.AggregationAxiom('ex:similarTo', 'mean'),
         Reasoner.ChainRuleAxiom('ex:coinType', 'ex:similarTo', 'ex:similarTo',

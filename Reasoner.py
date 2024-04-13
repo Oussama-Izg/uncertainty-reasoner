@@ -148,7 +148,7 @@ class AggregationAxiom(Axiom):
         return pd.concat([df_triples, df_agg]).drop_duplicates()
 
 
-class UncertaintyAssignmentAxiom (Axiom):
+class CertaintyAssignmentAxiom (Axiom):
     def __init__(self, predicate, uncertainty_object="ex:uncertain", uncertainty_value=0.2):
         super().__init__("preprocessing")
         self.predicate = predicate
