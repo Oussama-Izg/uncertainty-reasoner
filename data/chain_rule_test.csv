@@ -1,0 +1,7 @@
+s,p,o,weight,model
+ex:coin1,ex:coinType,ex:cn_type_1,0.5,
+ex:coin1,ex:coinType,ex:cn_type_2,0.5,
+ex:cn_type_1,ex:similarTo,ex:cn_type_3,0.6,
+ex:cn_type_1,ex:similarTo,ex:cn_type_2,0.8,
+ex:cn_type_2,ex:similarTo,ex:cn_type_3,0.5,
+ex:coin2,ex:coinType,ex:cn_type_1,1.0,
