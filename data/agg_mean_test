@@ -1,0 +1,8 @@
+s,p,o,weight,model
+ex:cn_type_1,ex:similarTo,ex:cn_type_3,0.6,ex:model_1
+ex:cn_type_1,ex:similarTo,ex:cn_type_3,0.55,ex:model_2
+ex:cn_type_1,ex:similarTo,ex:cn_type_3,0.8,ex:model_3
+ex:cn_type_1,ex:similarTo,ex:cn_type_2,0.99,ex:model_1
+ex:cn_type_1,ex:similarTo,ex:cn_type_2,0.8,ex:model_2
+ex:cn_type_2,ex:similarTo,ex:cn_type_3,0.7,ex:model_1
+ex:cn_type_2,ex:similarTo,ex:cn_type_3,0.5,ex:model_2

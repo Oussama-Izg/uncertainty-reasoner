@@ -215,7 +215,7 @@ class AggregationAxiom(Axiom):
 
         df_agg = df_agg.reset_index()
 
-        return pd.concat([df_triples, df_agg]).drop_duplicates()
+        return pd.concat([df_triples, df_agg], ignore_index=True).drop_duplicates()
 
 
 class CertaintyAssignmentAxiom (Axiom):
@@ -237,7 +237,7 @@ class CertaintyAssignmentAxiom (Axiom):
         df_selected_triples = df_triples[df_triples['p'] == self.predicate].copy()
         df_triples = df_triples[df_triples['p'] != self.predicate]
         df_agg = df_selected_triples[df_selected_triples['o'] != self.uncertainty_object].copy()
-        df_agg = df_agg.groupby(['s', 'p', 'model'])[['o']]
+        df_agg = df_agg.groupby(['s', 'p', 'model'], dropna=False)[['o']]
         df_agg = df_agg.count()
 
         df_agg = df_agg.reset_index()
@@ -251,6 +251,7 @@ class CertaintyAssignmentAxiom (Axiom):
         df_selected_triples.loc[df_selected_triples['o'] == self.uncertainty_object, 'weight'] = self.uncertainty_value
 
         df_selected_triples = df_selected_triples.drop(columns=['count'])
+        df_selected_triples['weight'] = df_selected_triples['weight'].round(3)
 
         return pd.concat([df_selected_triples, df_triples])
 
@@ -311,9 +312,10 @@ class DempsterShaferAxiom(Axiom):
                 result_tmp['o'].append(issuer)
                 result_tmp['weight'].append(mass_values[issuer])
             result_tmp = pd.DataFrame(result_tmp)
-            result = pd.concat([result, result_tmp])
+            result = pd.concat([result, result_tmp], ignore_index=True)
         result['model'] = np.nan
-        df_triples = pd.concat([df_triples[df_triples['p'] != self.predicate], result])
+        result['weight'] = result['weight'].round(3)
+        df_triples = pd.concat([df_triples[df_triples['p'] != self.predicate], result], ignore_index=True)
         return df_triples
 
 
@@ -379,6 +381,7 @@ class AFEDempsterShaferAxiom(Axiom):
                 result_tmp['weight'].append(mass_values[issuer])
             result_tmp = pd.DataFrame(result_tmp)
             result = pd.concat([result, result_tmp])
+        result['weight'] = result['weight'].round(3)
         df_triples = pd.concat([df_triples[df_triples['p'] != self.issuer_predicate], result])
         return df_triples
 

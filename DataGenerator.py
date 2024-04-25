@@ -22,7 +22,7 @@ def generate_vague_similarity_data(n_coin_types, n_models):
             'from_y': 'o'
         })
 
-        # A similar B <-> B similar A
+        # A similar B <-> B similar A so both should have the same value
         # Therefore, you remove the duplicates
         df['tmp'] = df['s'].astype('string')+","+df['o'].astype('string')
         df.loc[df['s'] < df['o'], 'tmp'] = df['o'].astype('string')+","+df['s'].astype('string')
@@ -37,7 +37,12 @@ def generate_vague_similarity_data(n_coin_types, n_models):
         # Random weights
         df['weight'] = np.round(np.random.rand(df.shape[0]), decimals=2)
         df['model'] = 'ex:model_' + str(model_nr)
-        result = pd.concat([result, df])
+
+        df_switched = df.rename(columns={
+            'p': 'o',
+            'o': 'p'
+        }).copy()
+        result = pd.concat([result, df, df_switched])
     return result.reset_index(drop=True)
 
 
