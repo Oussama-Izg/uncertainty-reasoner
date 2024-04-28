@@ -72,6 +72,34 @@ def generate_precise_certain_data(n_triples):
     return df
 
 
+def generate_type_triples(n_coins, n_coin_types):
+    """
+    Generate precise/certain triples to test SPARQL connectors.
+    :param n_triples: Number of certain triples
+    :return: Dataframe in internal format with certain and precise triples
+    """
+    coin_numbers = np.arange(1, n_coins + 1)
+    coin_type_numbers = np.arange(1, n_coin_types + 1)
+
+    df_coins = pd.DataFrame()
+
+    df_coins['s'] = coin_numbers
+    df_coins['o'] = "ex:Coin"
+    df_coins['s'] = "ex:coin_" + df_coins['s'].astype('string')
+    df_coins['p'] = "rdf:type"
+    df_coins['weight'] = 1
+
+    df_coin_types = pd.DataFrame()
+
+    df_coin_types['s'] = coin_type_numbers
+    df_coin_types['o'] = "ex:CoinType"
+    df_coin_types['s'] = "ex:cn_type_" + df_coin_types['s'].astype('string')
+    df_coin_types['p'] = "rdf:type"
+    df_coin_types['weight'] = 1
+
+    return pd.concat([df_coins, df_coin_types], ignore_index=True)
+
+
 def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object="ex:uncertain"):
     """
     Generates input data for the DempsterShaferAxiom. Each coin has 5 possible coin types that the experts could choose.
@@ -86,11 +114,20 @@ def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object=
     result_from = []
     result_to = []
     model = []
+    weights = []
     cn_type_numbers = np.arange(1, n_coin_types + 1)
     for i in range(n_coins):
         # Possible choices for the experts
         possible = np.random.choice(cn_type_numbers, size=5, replace=False)
         for m in range(n_models):
+            max_weight = 1.0
+            # Probability for the uncertain checkbox to indicate an uncertain checkbox selection
+            if np.random.rand() < 0.2:
+                result_from.append("ex:coin_" + str(i))
+                result_to.append(uncertainty_object)
+                model.append("ex:model_" + str(m))
+                weights.append(0.2)
+                max_weight -= 0.2
             n_choices = np.random.randint(1, 4)
             # Get expert choices
             choices = np.random.choice(possible, size=n_choices, replace=False)
@@ -98,14 +135,10 @@ def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object=
                 result_from.append("ex:coin_" + str(i))
                 result_to.append("ex:cn_type_" + str(choices[j]))
                 model.append("ex:model_" + str(m))
-            # Probability for the uncertain checkbox to indicate an uncertain checkbox selection
-            if np.random.rand() < 0.2:
-                result_from.append("ex:coin_" + str(i))
-                result_to.append(uncertainty_object)
-                model.append("ex:model_" + str(m))
-    df = pd.DataFrame({'s': result_from, 'o': result_to, 'model': model})
+                weights.append(max_weight/n_choices)
+
+    df = pd.DataFrame({'s': result_from, 'o': result_to, 'model': model, 'weight': weights})
     df['p'] = 'ex:isCoinType'
-    df['weight'] = 1
 
     return df
 

@@ -64,7 +64,7 @@ class Reasoner:
         :return: The resulting dataframe
         """
         # Find rows with new values
-        df_result = pd.concat([df_before, df_after]).drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).reset_index(drop=True)
+        df_result = pd.concat([df_before, df_after], ignore_index=True).drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).reset_index(drop=True)
         # Set reasoner name as model
         df_result['model'] = df_result['model'].fillna(self._reasoner_name)
         df_result = pd.concat([df_before, df_result])
@@ -105,8 +105,9 @@ class Reasoner:
                 df_old = self._df_triples.copy()
                 for axiom in self._rule_reasoning_axioms:
                     self._df_triples = axiom.reason(self._df_triples, self._df_classes)
-                if pd.concat([df_old, self._df_triples]).drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).shape[0] == 0:
+                if pd.concat([df_old, self._df_triples], ignore_index=True).drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).shape[0] == 0:
                     break
+                logger.info(self._df_triples.shape[0])
             end_rule_reasoning = time.time()
 
             logger.info(f"Rule based reasoning done after {counter} iterations in {round(end_rule_reasoning - start_rule_reasoning, 3)} seconds.")
@@ -473,7 +474,7 @@ class ChainRuleAxiom(Axiom):
 
     def reason(self, df_triples, df_classes):
         df_selected_triples = df_triples[(df_triples['p'] == self.antecedent1) |
-                                         (df_triples['p'] == self.antecedent2)].copy()
+                                         (df_triples['p'] == self.antecedent2)]
 
         # Enforce input threshold
         if self.input_threshold:
@@ -485,18 +486,18 @@ class ChainRuleAxiom(Axiom):
         # Enforce classes by inner-merging with df_classes
         if self.class1:
             df_triples_left = pd.merge(df_triples_left, df_classes[df_classes['class'] == self.class1],
-                                       right_on='s', left_on='node')
+                                       left_on='s', right_on='node')
             df_triples_left = df_triples_left.drop(columns=['class'])
         if self.class2:
             df_triples_left = pd.merge(df_triples_left, df_classes[df_classes['class'] == self.class2],
-                                       right_on='o', left_on='node')
+                                       left_on='o', right_on='node')
             df_triples_left = df_triples_left.drop(columns=['class'])
             df_triples_right = pd.merge(df_triples_right, df_classes[df_classes['class'] == self.class2],
-                                        right_on='s', left_on='node')
+                                        left_on='s', right_on='node')
             df_triples_right = df_triples_right.drop(columns=['class'])
         if self.class3:
             df_triples_right = pd.merge(df_triples_right, df_classes[df_classes['class'] == self.class3],
-                                        right_on='o', left_on='node')
+                                        left_on='o', right_on='node')
             df_triples_right = df_triples_right.drop(columns=['class'])
         # Merge antecedent triples
         df_result = pd.merge(df_triples_left, df_triples_right, left_on='o', right_on='s')
