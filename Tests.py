@@ -119,7 +119,7 @@ def reasoner_test_aggregation_mean(n_coin_types: int, iterations: int, conn_type
     return time_sum/iterations, data_retrieval_time_sum/iterations
 
 
-def test_dst_axiom(n_coins: int, n_coin_types: int, iterations: int):
+def reasoner_test_dst_axiom_synthetic(n_coins: int, n_coin_types: int, iterations: int):
     df_dst_input = DataGenerator.generate_dst_input_data(n_coins, n_coin_types, 3)
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -146,7 +146,7 @@ def test_dst_axiom(n_coins: int, n_coin_types: int, iterations: int):
     return time_sum / iterations, data_retrieval_time_sum / iterations, df_dst_input.shape[0]
 
 
-def test_DST_axiom_handcrafted_data():
+def reasoner_test_DST_axiom_handcrafted():
     logger.info("Generating data")
     df_dst_input = pd.read_csv('data/dst_test.csv')
 
@@ -170,7 +170,8 @@ def test_DST_axiom_handcrafted_data():
 
     reasoner.get_triples_as_df().to_csv('output/dst_test.csv', index=False)
 
-def test_uncertainty_assignment_axiom(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
+
+def reasoner_test_uncertainty_assignment_axiom_sythetic(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
     df_afe = DataGenerator.generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for)
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -197,7 +198,8 @@ def test_uncertainty_assignment_axiom(n_coins: int, n_issuer: int, n_issuing_for
 
     return time_sum / iterations, data_retrieval_time_sum / iterations
 
-def test_uncertainty_assignment_axiom_handcrafted():
+
+def reasoner_test_uncertainty_assignment_axiom_handcrafted():
     df_afe = pd.read_csv('data/afe_test_data.csv')
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -218,7 +220,7 @@ def test_uncertainty_assignment_axiom_handcrafted():
     reasoner.get_triples_as_df().to_csv('output/afe_test_data_uncertainty_assignment.csv', index=False)
 
 
-def test_AFE_DST_synthetic_data(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
+def reasoner_test_AFE_DST_synthetic(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
     df_afe = DataGenerator.generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for)
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -246,7 +248,7 @@ def test_AFE_DST_synthetic_data(n_coins: int, n_issuer: int, n_issuing_for: int,
 
     return time_sum / iterations, data_retrieval_time_sum / iterations
 
-def test_AFE_DST_test_data():
+def reasoner_test_AFE_DST_handcrafted():
     df_afe = pd.read_csv('data/afe_test_data.csv')
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
@@ -265,7 +267,7 @@ def test_AFE_DST_test_data():
     reasoner.get_triples_as_df().to_csv('output/afe_test_data.csv')
 
 
-def test_AFE_DST_real_data():
+def reasoner_test_AFE_DST_real_data():
     df_afe = pd.read_csv('data/afe_input.csv')
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
@@ -285,7 +287,7 @@ def test_AFE_DST_real_data():
     reasoner.get_triples_as_df().to_csv('output/afe_output.csv')
 
 
-def test_chain_rule_handcrafted():
+def reasoner_test_chain_rule_handcrafted():
     df_chain_rule = pd.read_csv('data/chain_rule_test.csv')
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
@@ -293,19 +295,31 @@ def test_chain_rule_handcrafted():
     conn.delete_query(delete_all=True)
     conn.upload_df(df_chain_rule)
     axioms = [
+        Reasoner.DempsterShaferAxiom('ex:isCoinType'),
+        Reasoner.AggregationAxiom('ex:similarTo', 'mean'),
+        Reasoner.ChainRuleAxiom('ex:similarTo', 'ex:similarTo', 'ex:similarTo',
+                                'product', input_threshold=0.8),
         Reasoner.ChainRuleAxiom('ex:isCoinType', 'ex:similarTo', 'ex:similarTo',
                                 'product', sum_values=True),
-        Reasoner.DisjointAxiom('ex:isCoinType', 'ex:similarTo', throw_exception=False)
+        Reasoner.ChainRuleAxiom('ex:isCoinType', 'ex:isCoinTypeOf', 'ex:sameCoinTypeAs',
+                                'product'),
+        Reasoner.DisjointAxiom('ex:isCoinType', 'ex:similarTo', throw_exception=False),
+        Reasoner.DisjointAxiom('ex:isCoinTypeOf', 'ex:similarTo', throw_exception=False),
+        Reasoner.SelfDisjointAxiom('ex:similarTo', throw_exception=False),
+        Reasoner.InverseAxiom('ex:similarTo', 'ex:similarTo'),
+        Reasoner.InverseAxiom('ex:isCoinType', 'ex:isCoinTypeOf'),
+        Reasoner.InverseAxiom('ex:isCoinTypeOf', 'ex:isCoinType'),
+        Reasoner.InverseAxiom('ex:sameCoinTypeAs', 'ex:sameCoinTypeAs'),
     ]
 
     reasoner = Reasoner.Reasoner(axioms)
     reasoner.load_data_from_endpoint(conn)
 
     reasoner.reason()
-    reasoner.get_triples_as_df().to_csv('output.csv')
+    reasoner.get_triples_as_df().sort_values(by=['s', 'p', 'o']).to_csv('output/chain_rule_test.csv', index=False)
 
 
-def test_chain_rule(n_coins, n_coin_types, iterations):
+def reasoner_test_chain_rule_synthetic(n_coins, n_coin_types, iterations):
     df_dst_input = DataGenerator.generate_dst_input_data(n_coins, n_coin_types, 3)
     df_similarity_input = DataGenerator.generate_vague_similarity_data(n_coin_types, 3)
     df_types = DataGenerator.generate_type_triples(n_coins, n_coin_types)
@@ -338,9 +352,6 @@ def test_chain_rule(n_coins, n_coin_types, iterations):
         Reasoner.ChainRuleAxiom('ex:isCoinType', 'ex:similarTo', 'ex:similarTo',
                                 'product', sum_values=True, output_threshold=0.8, class_2='ex:CoinType',
                                 class_3='ex:Coin'),
-        Reasoner.ChainRuleAxiom('ex:similarTo', 'ex:isCoinTypeOf', 'ex:similarTo',
-                                'product', sum_values=True, output_threshold=0.8, class_1='ex:Coin',
-                                class_3='ex:CoinType'),
         Reasoner.ChainRuleAxiom('ex:isCoinType', 'ex:isCoinTypeOf', 'ex:sameCoinTypeAs',
                                 'product'),
         Reasoner.DisjointAxiom('ex:isCoinType', 'ex:similarTo', throw_exception=False),
@@ -367,7 +378,7 @@ def test_chain_rule(n_coins, n_coin_types, iterations):
     return time_sum / iterations, data_retrieval_time_sum / iterations
 
 
-def test_chain_rule_part(n_coins, n_coin_types, iterations):
+def reasoner_test_chain_rule_part_synthetic(n_coins, n_coin_types, iterations):
     df_dst_input = DataGenerator.generate_dst_input_data(n_coins, n_coin_types, 3)
     df_similarity_input = DataGenerator.generate_vague_similarity_data(n_coin_types, 3)
     df_types = DataGenerator.generate_type_triples(n_coins, n_coin_types)
@@ -388,9 +399,6 @@ def test_chain_rule_part(n_coins, n_coin_types, iterations):
         Reasoner.ChainRuleAxiom('ex:isCoinType', 'ex:similarTo', 'ex:similarTo',
                                 'product', sum_values=True, output_threshold=0.8, class_2='ex:CoinType',
                                 class_3='ex:Coin'),
-        Reasoner.ChainRuleAxiom('ex:similarTo', 'ex:isCoinTypeOf', 'ex:similarTo',
-                                'product', sum_values=True, output_threshold=0.8, class_1='ex:Coin',
-                                class_3='ex:CoinType'),
         Reasoner.ChainRuleAxiom('ex:isCoinType', 'ex:isCoinTypeOf', 'ex:sameCoinTypeAs',
                                 'product'),
         Reasoner.DisjointAxiom('ex:isCoinType', 'ex:similarTo', throw_exception=False),
@@ -491,7 +499,7 @@ if __name__ == '__main__':
         data_retrieval_means = []
         triple_numbers = []
         for coin_type_number in coin_type_numbers:
-            mean_time, data_retrieval_mean_time, n_triples = test_dst_axiom(coin_type_number, 1000, 10)
+            mean_time, data_retrieval_mean_time, n_triples = reasoner_test_dst_axiom_synthetic(coin_type_number, 1000, 10)
             triple_numbers.append(n_triples)
             means.append(mean_time)
             data_retrieval_means.append(data_retrieval_mean_time)
@@ -500,7 +508,7 @@ if __name__ == '__main__':
         print(means)
         print(data_retrieval_means)
     elif selection == 6:
-        test_DST_axiom_handcrafted_data()
+        reasoner_test_DST_axiom_handcrafted()
     elif selection == 7:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
@@ -509,7 +517,7 @@ if __name__ == '__main__':
         means = []
         data_retrieval_means = []
         for coin_type_number in coin_type_numbers:
-            mean_time, data_retrieval_mean_time = test_uncertainty_assignment_axiom(coin_type_number, 100, 100, 10)
+            mean_time, data_retrieval_mean_time = reasoner_test_uncertainty_assignment_axiom_sythetic(coin_type_number, 100, 100, 10)
             means.append(mean_time)
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_type_number} coins.")
@@ -517,7 +525,7 @@ if __name__ == '__main__':
         print(means)
         print(data_retrieval_means)
     elif selection == 8:
-        test_uncertainty_assignment_axiom_handcrafted()
+        reasoner_test_uncertainty_assignment_axiom_handcrafted()
     elif selection == 9:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
@@ -526,7 +534,7 @@ if __name__ == '__main__':
         means = []
         data_retrieval_means = []
         for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time = test_AFE_DST_synthetic_data(coin_number, 100, 100, 10)
+            mean_time, data_retrieval_mean_time = reasoner_test_AFE_DST_synthetic(coin_number, 100, 100, 10)
             means.append(mean_time)
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
@@ -534,9 +542,9 @@ if __name__ == '__main__':
         print(means)
         print(data_retrieval_means)
     elif selection == 10:
-        test_AFE_DST_test_data()
+        reasoner_test_AFE_DST_handcrafted()
     elif selection == 11:
-        test_AFE_DST_real_data()
+        reasoner_test_AFE_DST_real_data()
     elif selection == 12:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
@@ -545,7 +553,7 @@ if __name__ == '__main__':
         means = []
         data_retrieval_means = []
         for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time = test_chain_rule(coin_number, 100, 10)
+            mean_time, data_retrieval_mean_time = reasoner_test_chain_rule_synthetic(coin_number, 100, 10)
             means.append(mean_time)
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
@@ -560,7 +568,7 @@ if __name__ == '__main__':
         means = []
         data_retrieval_means = []
         for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time = test_chain_rule_part(coin_number, 100, 10)
+            mean_time, data_retrieval_mean_time = reasoner_test_chain_rule_part_synthetic(coin_number, 100, 10)
             means.append(mean_time)
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
@@ -568,5 +576,5 @@ if __name__ == '__main__':
         print(means)
         print(data_retrieval_means)
     elif selection == 14:
-        test_chain_rule_handcrafted()
+        reasoner_test_chain_rule_handcrafted()
 

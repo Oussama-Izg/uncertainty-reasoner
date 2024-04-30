@@ -67,15 +67,15 @@ class Reasoner:
         df_result = pd.concat([df_before, df_after], ignore_index=True).drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).reset_index(drop=True)
         # Set reasoner name as model
         df_result['model'] = df_result['model'].fillna(self._reasoner_name)
-        df_result = pd.concat([df_before, df_result])
+        df_result = pd.concat([df_before, df_result], ignore_index=True)
 
         # Just a quick check, that only the highest certainties are used
         df_result = df_result.sort_values(by=['weight'], ascending=True)
-        df_result = df_result.drop_duplicates(subset=['s', 'p', 'o', 'model'])
+        df_result = df_result.drop_duplicates(subset=['s', 'p', 'o', 'model'], keep='last')
 
         return df_result
 
-    def reason(self) -> pd.DataFrame:
+    def reason(self):
         """
         Start the reasoning process. All preprocessing axioms are applied once. The chain rule axioms are apllied until
         the weights don't change or the maximum number of iterations is reached. Then the post-processing axioms are
@@ -478,7 +478,7 @@ class ChainRuleAxiom(Axiom):
 
         # Enforce input threshold
         if self.input_threshold:
-            df_selected_triples = df_selected_triples[df_selected_triples['weight'] > self.input_threshold]
+            df_selected_triples = df_selected_triples[df_selected_triples['weight'] >= self.input_threshold]
 
         df_triples_left = df_selected_triples[df_selected_triples['p'] == self.antecedent1]
         df_triples_right = df_selected_triples[df_selected_triples['p'] == self.antecedent2]
@@ -528,8 +528,9 @@ class ChainRuleAxiom(Axiom):
 
         # Apply output threshold
         if self.output_threshold:
-            df_result = df_result[df_result['weight'] > self.output_threshold]
+            df_result = df_result[df_result['weight'] >= self.output_threshold]
 
+        df_result['weight'] = df_result['weight'].round(3)
         df_triples = pd.concat([df_triples, df_result])
 
         # Only keep the triple with the highest weight
@@ -601,6 +602,6 @@ class SelfDisjointAxiom(Axiom):
         if (df_tmp['s'] == df_tmp['o']).sum() != 0 and self.throw_exception:
             raise ConstraintException(f"Constraint violation for predicate {self.predicate}")
         else:
-            df_triples = df_triples[(df_triples['p'] == self.predicate) | (df_triples['s'] != df_triples['o'])]
+            df_triples = df_triples[(df_triples['p'] != self.predicate) | (df_triples['s'] != df_triples['o'])]
 
         return df_triples
