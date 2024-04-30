@@ -320,11 +320,102 @@ class DempsterShaferAxiom(Axiom):
         return df_triples
 
 
+class CoinHoardDempsterShaferAxiom(Axiom):
+    """
+    Use-case-specific Dempster-Shafer axiom for inferring closing dates from coin hoards.
+    """
+    def __init__(self, hoard_predicate: str = 'ex:containsCoin', coin_type_predicate: str = 'ex:isCoinType',
+                 time_interval_predicate: str = 'ex:hasTimeInterval', time_interval_start_predicate: str = 'ex:intervalStart',
+                 time_interval_end_predicate: str = 'ex:intervalEnd', closing_date_predicate: str = 'ex:closingDate',
+                 ignorance_object: str = 'ex:uncertain', ignorance: int = 0.2):
+        """
+        :param hoard_predicate: Hoard predicate from hoard to coin.
+        :param coin_type_predicate: Coin type predicate from coin to coin type.
+        :param time_interval_predicate: Time interval predicate from coin to time interval blank node.
+        :param time_interval_start_predicate: Start of time interval predicate.
+        :param time_interval_end_predicate: End of time interval predicate.
+        :param closing_date_predicate: Resulting closing date predicate.
+        :param ignorance_object: Object that increases ignorance for the mass function
+        :param ignorance: Default ignorance
+        """
+        super().__init__("preprocessing")
+        self.coin_type_predicate = coin_type_predicate
+        self.hoard_predicate = hoard_predicate
+        self.ignorance = ignorance
+        self.ignorance_object = ignorance_object
+        self.time_interval_start_predicate = time_interval_start_predicate
+        self.time_interval_end_predicate = time_interval_end_predicate
+        self.time_interval_predicate = time_interval_predicate
+        self.closing_date_predicate = closing_date_predicate
+
+    def reason(self, df_triples: pd.DataFrame, df_classes):
+        df_hoards = df_triples[(df_triples['p'] == self.hoard_predicate)]
+        df_coin_types = df_triples[(df_triples['p'] == self.coin_type_predicate)]
+        df_time_intervals = df_triples[(df_triples['p'] == self.time_interval_predicate)]
+        df_interval_boundaries = df_triples[(df_triples['p'] == self.time_interval_start_predicate) |
+                                            (df_triples['p'] == self.time_interval_end_predicate)]
+        df_interval_boundaries = df_interval_boundaries.pivot(index=['s'],columns=['p'], values=['o']).reset_index()
+        df_interval_boundaries = df_interval_boundaries.rename(columns={
+            self.time_interval_predicate: 'start',
+            self.time_interval_end_predicate: 'end'
+        })
+
+        df_time_intervals = pd.merge(df_time_intervals, df_interval_boundaries, left_on='o', right_on='s',
+                                     suffixes=(None, '_y'))[['s', 'start', 'end']]
+        df_time_intervals = pd.merge(df_coin_types, df_time_intervals, left_on='o', right_on='s', suffixes=(None, '_y'))
+        result = pd.DataFrame()
+        for i, hoard in df_hoards['s'].drop_duplicates().items():
+            df_hoard = df_hoards[df_hoards['s'] == hoard]
+            joint_mass = None
+            for j, coin in df_hoard['o'].drop_duplicates().items():
+                df_time_interval_subsets = df_time_intervals[df_time_intervals['s'] == coin]
+                if joint_mass:
+                    coin_type_mass_function = DempsterShafer.IntervalMassFunction(
+                        DempsterShafer.interval_df_to_subset_dict(df_time_interval_subsets, self.ignorance,
+                                                         self.ignorance_object))
+                    joint_mass = joint_mass.join_masses(coin_type_mass_function)
+                else:
+                    joint_mass = DempsterShafer.IntervalMassFunction(
+                        DempsterShafer.interval_df_to_subset_dict(df_time_interval_subsets,self.ignorance,
+                                                                  self.ignorance_object))
+            mass_values = {}
+            for interval in joint_mass.get_mass_values():
+                if interval == '*':
+                    mass_values['*'] = joint_mass[interval]
+                else:
+                    mass_values[interval[0]] = mass_values.get(interval[0], 0) + joint_mass[interval]
+
+            result_tmp = {
+                's': [],
+                'p': [],
+                'o': [],
+                'weight': []
+            }
+            for closing_date in mass_values:
+                if closing_date == "*":
+                    result_tmp['s'].append(hoard)
+                    result_tmp['p'].append(self.closing_date_predicate)
+                    result_tmp['o'].append(self.ignorance_object)
+                    result_tmp['weight'].append(mass_values[closing_date])
+                    continue
+                result_tmp['s'].append(hoard)
+                result_tmp['p'].append(self.closing_date_predicate)
+                result_tmp['o'].append(closing_date)
+                result_tmp['weight'].append(mass_values[closing_date])
+            result_tmp = pd.DataFrame(result_tmp)
+            result = pd.concat([result, result_tmp])
+        result['weight'] = result['weight'].round(3)
+        df_triples = pd.concat([df_triples[df_triples['p'] != self.coin_type_predicate], result])
+        return df_triples
+
+
 class AFEDempsterShaferAxiom(Axiom):
     """
     Use-case-specific Dempster-Shafer axiom for AFE data
     """
-    def __init__(self, issuer_predicate='ex:issuer', issuing_for_predicate='ex:issuing_for', domain_knowledge_predicate='ex:domain_knowledge', ignorance_object='ex:uncertain', ignorance=0.2):
+    def __init__(self, issuer_predicate: str = 'ex:issuer', issuing_for_predicate: str = 'ex:issuing_for',
+                 domain_knowledge_predicate: str = 'ex:domain_knowledge', ignorance_object: str = 'ex:uncertain',
+                 ignorance=0.2):
         """
         :param issuer_predicate: Issuer predicate
         :param issuing_for_predicate: Issuing for predicate
