@@ -127,6 +127,7 @@ def interval_df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncer
             result[(x['start'], x['end'])] = x['weight'] - default_ignorance / n
     return result
 
+
 def df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncertainty_object:str) -> dict[str, float]:
     """
     Translate dataframe to a subset dict
@@ -135,8 +136,7 @@ def df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncertainty_ob
     :param uncertainty_object: The uncertainty object that indicates ignorance
     :return: Subset as dict
     """
-    result = {}
-    result['*'] = default_ignorance
+    result = {'*': default_ignorance}
     n = df[df['o'] != uncertainty_object].shape[0]
     for i, x in df.iterrows():
         if x['o'] == uncertainty_object:

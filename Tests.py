@@ -171,6 +171,30 @@ def reasoner_test_DST_axiom_handcrafted():
     reasoner.get_triples_as_df().to_csv('output/dst_test.csv', index=False)
 
 
+def reasoner_test_coin_hoard_axiom_handcrafted():
+    logger.info("Generating data")
+    df_coin_hoard_input = pd.read_csv('data/coin_hoard_test.csv')
+
+    conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
+                                               UPDATE_ENDPOINT,
+                                               GSP_ENDPOINT)
+    logger.info("Deleting old data")
+    conn.delete_query(delete_all=True)
+    logger.info("Uploading data")
+    conn.upload_df(df_coin_hoard_input)
+    axioms = [
+        Reasoner.CoinHoardDempsterShaferAxiom()
+    ]
+
+    reasoner = Reasoner.Reasoner(axioms)
+    reasoner.load_data_from_endpoint(conn)
+    reasoner.reason()
+
+    logger.info("Writing output to output/dst_test.csv")
+
+    reasoner.get_triples_as_df().to_csv('output/coin_hoard_test.csv', index=False)
+
+
 def reasoner_test_uncertainty_assignment_axiom_sythetic(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
     df_afe = DataGenerator.generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for)
 
@@ -432,23 +456,25 @@ if __name__ == '__main__':
     print("4: Test Use Case 1 with similarity models from multiple models (handcrafted)")
     print("5: Test Use Case 2 with coin types from multiple models (synthetic, benchmark)")
     print("6: Test Use Case 2 with coin types from multiple models (handcrafted)")
-    print("7: Test Use Case 3 with certainty assignments to triple alternatives (synthetic, benchmark)")
-    print("8: Test Use Case 3 with certainty assignments to triple alternatives (handcrafted)")
-    print("9: Test Use Case 4 with AFE DST (synthetic, benchmark)")
-    print("10: Test Use Case 4 with AFE DST (handcrafted)")
-    print("11: Test Use Case 4 with AFE DST (real data)")
-    print("12: Test Use Case 5 similarity chain rules (synthetic, benchmark)")
-    print("13: Test Use Case 5 similarity chain rules while removing one chain rule (synthetic, benchmark)")
-    print("14: Test Use Case 5 similarity chain rules (handcrafted)")
+    print("7: Test Use Case 3 with coin hoards (synthetic, benchmark)")
+    print("8: Test Use Case 3 with coin hoards (handcrafted)")
+    print("9: Test Use Case 4 with certainty assignments to triple alternatives (synthetic, benchmark)")
+    print("10: Test Use Case 4 with certainty assignments to triple alternatives (handcrafted)")
+    print("11: Test Use Case 5 with AFE DST (synthetic, benchmark)")
+    print("12: Test Use Case 5 with AFE DST (handcrafted)")
+    print("13: Test Use Case 5 with AFE DST (real data)")
+    print("14: Test Use Case 6 similarity chain rules (synthetic, benchmark)")
+    print("15: Test Use Case 6 similarity chain rules while removing one chain rule (synthetic, benchmark)")
+    print("16: Test Use Case 6 similarity chain rules (handcrafted)")
 
     selection = -1
     while True:
         try:
             selection = int(input("Select the test by typing the number: "))
-            if 0 < selection <= 14:
+            if 0 < selection <= 16:
                 break
             else:
-                print("Selected number must be between 1 and 14")
+                print("Selected number must be between 1 and 16")
         except ValueError:
             print("This is not a number. Try again.")
 
@@ -510,6 +536,10 @@ if __name__ == '__main__':
     elif selection == 6:
         reasoner_test_DST_axiom_handcrafted()
     elif selection == 7:
+        pass
+    elif selection == 8:
+        reasoner_test_coin_hoard_axiom_handcrafted()
+    elif selection == 9:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -524,9 +554,9 @@ if __name__ == '__main__':
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
         print(means)
         print(data_retrieval_means)
-    elif selection == 8:
+    elif selection == 10:
         reasoner_test_uncertainty_assignment_axiom_handcrafted()
-    elif selection == 9:
+    elif selection == 11:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -541,11 +571,11 @@ if __name__ == '__main__':
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
         print(means)
         print(data_retrieval_means)
-    elif selection == 10:
-        reasoner_test_AFE_DST_handcrafted()
-    elif selection == 11:
-        reasoner_test_AFE_DST_real_data()
     elif selection == 12:
+        reasoner_test_AFE_DST_handcrafted()
+    elif selection == 13:
+        reasoner_test_AFE_DST_real_data()
+    elif selection == 14:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -560,7 +590,7 @@ if __name__ == '__main__':
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
         print(means)
         print(data_retrieval_means)
-    elif selection == 13:
+    elif selection == 15:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -575,6 +605,6 @@ if __name__ == '__main__':
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
         print(means)
         print(data_retrieval_means)
-    elif selection == 14:
+    elif selection == 16:
         reasoner_test_chain_rule_handcrafted()
 

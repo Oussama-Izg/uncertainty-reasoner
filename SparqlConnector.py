@@ -1,5 +1,6 @@
+import numpy as np
 import requests
-import io
+import json
 import pandas as pd
 from abc import ABC, abstractmethod
 import logging
@@ -49,7 +50,7 @@ class SparqlBaseConnector(ABC):
         :return: Result as a DataFrame
         """
         headers = {
-            'Accept': 'text/csv; charset=utf-8'
+            'Accept': 'application/json; charset=utf-8'
         }
         data = {
             'query': query
@@ -57,7 +58,25 @@ class SparqlBaseConnector(ABC):
         response = requests.post(self._query_endpoint, data=data, headers=headers)
         if not response:
             raise Exception(f"Failed to query data: {response.reason}")
-        return pd.read_csv(io.StringIO(response.text))
+        df = pd.json_normalize(json.loads(response.text), record_path=["results", "bindings"])
+        df = df.rename(columns={
+            's.value': 's',
+            'p.value': 'p',
+            'o.value': 'o',
+            'weight.value': 'weight',
+            'model.value': 'model',
+        })
+        df.loc[df['s.type'] == 'bnode', 's'] = "_:" + df['s']
+        df.loc[df['o.type'] == 'bnode', 'o'] = "_:" + df['o']
+        df.loc[~df['o.datatype'].isna(), 'o'] = "\""+df['o']+"\"^^"+df['o.datatype']
+        columns = df.columns.tolist()
+        if not 'model' in columns:
+            df['model'] = np.nan
+        if not 'weight' in columns:
+            df['weight'] = 1.0
+        df = df[['s', 'p', 'o', 'weight', 'model']]
+        df['weight'] = df['weight'].astype('float64')
+        return df
 
     def delete_query(self, query: str = None, delete_all: bool = False) -> None:
         """

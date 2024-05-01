@@ -63,15 +63,18 @@ class Reasoner:
         :param df_after: Dataframe after
         :return: The resulting dataframe
         """
+        df_before['source'] = 'before'
         # Find rows with new values
-        df_result = pd.concat([df_before, df_after], ignore_index=True).drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).reset_index(drop=True)
+        df_result = pd.concat([df_before, df_after], ignore_index=True)
+        df_result = df_result.drop_duplicates(subset=['s', 'p', 'o', 'weight'], keep=False).reset_index(drop=True)
+        df_result.to_csv('export.csv', index=False)
         # Set reasoner name as model
         df_result['model'] = df_result['model'].fillna(self._reasoner_name)
-        df_result = pd.concat([df_before, df_result], ignore_index=True)
-
+        df_result = pd.concat([df_before, df_result[df_result['source'] != 'before']], ignore_index=True)
         # Just a quick check, that only the highest certainties are used
         df_result = df_result.sort_values(by=['weight'], ascending=True)
         df_result = df_result.drop_duplicates(subset=['s', 'p', 'o', 'model'], keep='last')
+        df_result = df_result.drop(columns=['source'])
 
         return df_result
 
@@ -322,7 +325,7 @@ class DempsterShaferAxiom(Axiom):
 
 class CoinHoardDempsterShaferAxiom(Axiom):
     """
-    Use-case-specific Dempster-Shafer axiom for inferring closing dates from coin hoards.
+    Use-case-specific Dempster-Shafer axiom for inferring closing dates for coin hoards.
     """
     def __init__(self, hoard_predicate: str = 'ex:containsCoin', coin_type_predicate: str = 'ex:isCoinType',
                  time_interval_predicate: str = 'ex:hasTimeInterval', time_interval_start_predicate: str = 'ex:intervalStart',
@@ -353,16 +356,21 @@ class CoinHoardDempsterShaferAxiom(Axiom):
         df_coin_types = df_triples[(df_triples['p'] == self.coin_type_predicate)]
         df_time_intervals = df_triples[(df_triples['p'] == self.time_interval_predicate)]
         df_interval_boundaries = df_triples[(df_triples['p'] == self.time_interval_start_predicate) |
-                                            (df_triples['p'] == self.time_interval_end_predicate)]
-        df_interval_boundaries = df_interval_boundaries.pivot(index=['s'],columns=['p'], values=['o']).reset_index()
+                                            (df_triples['p'] == self.time_interval_end_predicate)].copy()
+        df_interval_boundaries['o'] = df_interval_boundaries['o'].str.split("\"\^\^", regex=True).str[0]
+        df_interval_boundaries['o'] = df_interval_boundaries['o'].str.strip("\"").astype(int)
+        df_interval_boundaries = df_interval_boundaries.pivot(index=['s'],columns=['p'], values=['o'])
+        df_interval_boundaries.columns = df_interval_boundaries.columns.droplevel(0)
+        df_interval_boundaries = df_interval_boundaries.reset_index().rename_axis(None, axis=1)
         df_interval_boundaries = df_interval_boundaries.rename(columns={
-            self.time_interval_predicate: 'start',
+            self.time_interval_start_predicate: 'start',
             self.time_interval_end_predicate: 'end'
         })
 
         df_time_intervals = pd.merge(df_time_intervals, df_interval_boundaries, left_on='o', right_on='s',
                                      suffixes=(None, '_y'))[['s', 'start', 'end']]
-        df_time_intervals = pd.merge(df_coin_types, df_time_intervals, left_on='o', right_on='s', suffixes=(None, '_y'))
+        df_time_intervals = pd.merge(df_coin_types, df_time_intervals, left_on='o', right_on='s', suffixes=(None, '_y'),
+                                     how='left')
         result = pd.DataFrame()
         for i, hoard in df_hoards['s'].drop_duplicates().items():
             df_hoard = df_hoards[df_hoards['s'] == hoard]
@@ -381,9 +389,9 @@ class CoinHoardDempsterShaferAxiom(Axiom):
             mass_values = {}
             for interval in joint_mass.get_mass_values():
                 if interval == '*':
-                    mass_values['*'] = joint_mass[interval]
+                    mass_values['*'] = joint_mass.get_mass_values()[interval]
                 else:
-                    mass_values[interval[0]] = mass_values.get(interval[0], 0) + joint_mass[interval]
+                    mass_values[interval[0]] = mass_values.get(interval[0], 0) + joint_mass.get_mass_values()[interval]
 
             result_tmp = {
                 's': [],
@@ -400,7 +408,7 @@ class CoinHoardDempsterShaferAxiom(Axiom):
                     continue
                 result_tmp['s'].append(hoard)
                 result_tmp['p'].append(self.closing_date_predicate)
-                result_tmp['o'].append(closing_date)
+                result_tmp['o'].append("\"" + str(closing_date) + "\"^^xsd:integer")
                 result_tmp['weight'].append(mass_values[closing_date])
             result_tmp = pd.DataFrame(result_tmp)
             result = pd.concat([result, result_tmp])
