@@ -100,7 +100,7 @@ def generate_type_triples(n_coins, n_coin_types):
     return pd.concat([df_coins, df_coin_types], ignore_index=True)
 
 
-def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object="ex:uncertain"):
+def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object="ex:uncertain", no_model=False):
     """
     Generates input data for the DempsterShaferAxiom. Each coin has 5 possible coin types that the experts could choose.
     The experts choose up to three each.
@@ -109,6 +109,7 @@ def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object=
     :param n_coin_types: Number of coin types
     :param n_models: Number of experts or models
     :param uncertainty_object: Uncertainty object to indicate that the expert is uncertain about the selection
+    :param no_model: Do not fill the model column
     :return: DST example data
     """
     result_from = []
@@ -136,8 +137,10 @@ def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object=
                 result_to.append("ex:cn_type_" + str(choices[j]))
                 model.append("ex:model_" + str(m))
                 weights.append(max_weight/n_choices)
-
-    df = pd.DataFrame({'s': result_from, 'o': result_to, 'model': model, 'weight': weights})
+    if no_model:
+        df = pd.DataFrame({'s': result_from, 'o': result_to, 'model': model, 'weight': weights})
+    else:
+        df = pd.DataFrame({'s': result_from, 'o': result_to, 'model': model, 'weight': weights})
     df['p'] = 'ex:isCoinType'
 
     return df
@@ -207,9 +210,39 @@ def generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for, uncertainty_ob
     return df
 
 
+def generate_coin_hoard_use_case_input(n_coin_hoards: int, n_coin_types: int):
+    result_from = []
+    result_predicate = []
+    result_to = []
+    coin_counter = 1
+    for i in range(n_coin_hoards):
+        n_coin_hoard_coins = np.random.randint(3, 11)
+        for j in range(n_coin_hoard_coins):
+            result_from.append("ex:coin_hoard_" + str(i + 1))
+            result_to.append("ex:coin_" + str(coin_counter))
+            result_predicate.append("ex:containsCoin")
+            coin_counter += 1
+    for i in range(n_coin_types):
+        result_from.append("ex:coin_type_" + str(coin_counter))
+        result_to.append(f"_:b{i}")
+        result_predicate.append("ex:hasTimeInterval")
 
+        interval_start = np.random.randint(-200, 1)
+        interval_end = np.random.randint(interval_start, 1)
+        result_to.append(f"\"{interval_start}\"^^xsd:integer")
+        result_from.append(f"_:b{i}")
+        result_predicate.append("ex:intervalStart")
 
+        result_to.append(f"\"{interval_end}\"^^xsd:integer")
+        result_from.append(f"_:b{i}")
+        result_predicate.append("ex:intervalEnd")
+    df = pd.DataFrame({'s': result_from, 'o': result_to, 'p': result_predicate})
+    df['weight'] = 1
+    df['model'] = np.nan
 
+    df = pd.concat([df, generate_dst_input_data(coin_counter, n_coin_types, 1, no_model=True)],
+                   ignore_index=True)
 
+    return df
 
 

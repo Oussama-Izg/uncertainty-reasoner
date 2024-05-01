@@ -195,6 +195,34 @@ def reasoner_test_coin_hoard_axiom_handcrafted():
     reasoner.get_triples_as_df().to_csv('output/coin_hoard_test.csv', index=False)
 
 
+def reasoner_test_coin_hoard_axiom_synthetic(n_coin_hoards, n_coin_types, iterations):
+    logger.info("Generating data")
+    df_coin_hoard_input = DataGenerator.generate_coin_hoard_use_case_input(n_coin_hoards, n_coin_types)
+
+    conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
+                                               UPDATE_ENDPOINT,
+                                               GSP_ENDPOINT)
+    conn.delete_query(delete_all=True)
+    conn.upload_df(df_coin_hoard_input)
+    axioms = [
+        Reasoner.CoinHoardDempsterShaferAxiom()
+    ]
+
+    time_sum = 0
+    data_retrieval_time_sum = 0
+    for i in range(iterations):
+        start = time.time()
+        reasoner = Reasoner.Reasoner(axioms)
+        reasoner.load_data_from_endpoint(conn)
+        end = time.time()
+        data_retrieval_time_sum += end - start
+        reasoner.reason()
+        end = time.time()
+        time_sum += end - start
+
+    return time_sum / iterations, data_retrieval_time_sum / iterations
+
+
 def reasoner_test_uncertainty_assignment_axiom_sythetic(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
     df_afe = DataGenerator.generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for)
 
@@ -536,7 +564,20 @@ if __name__ == '__main__':
     elif selection == 6:
         reasoner_test_DST_axiom_handcrafted()
     elif selection == 7:
-        pass
+        # Disable logging messages for the reasoner
+        #logging.getLogger('Reasoner').setLevel(logging.WARNING)
+
+        coin_hoard_numbers = [1000, 2000]
+        means = []
+        data_retrieval_means = []
+        for coin_hoard_number in coin_hoard_numbers:
+            mean_time, data_retrieval_mean_time = reasoner_test_coin_hoard_axiom_synthetic(coin_hoard_number, 1000, 10)
+            means.append(mean_time)
+            data_retrieval_means.append(data_retrieval_mean_time)
+            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_hoard_number} coin hoards.")
+            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+        print(means)
+        print(data_retrieval_means)
     elif selection == 8:
         reasoner_test_coin_hoard_axiom_handcrafted()
     elif selection == 9:
