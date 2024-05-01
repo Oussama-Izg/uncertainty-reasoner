@@ -168,7 +168,7 @@ def reasoner_test_DST_axiom_handcrafted():
 
     logger.info("Writing output to output/dst_test.csv")
 
-    reasoner.get_triples_as_df().to_csv('output/dst_test.csv', index=False)
+    reasoner.get_triples_as_df().sort_values(by=['s', 'p', 'o']).to_csv('output/dst_test.csv', index=False)
 
 
 def reasoner_test_coin_hoard_axiom_handcrafted():
@@ -310,6 +310,7 @@ def reasoner_test_AFE_DST_handcrafted():
     axioms = [
         Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
         Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
+        Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge"),
         Reasoner.AFEDempsterShaferAxiom('ex:issuer', 'ex:issuing_for', 'ex:domain_knowledge')
     ]
 
@@ -329,6 +330,7 @@ def reasoner_test_AFE_DST_real_data():
     axioms = [
         Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
         Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
+        Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge"),
         Reasoner.AFEDempsterShaferAxiom('ex:issuer', 'ex:issuing_for', 'ex:domain_knowledge')
     ]
 

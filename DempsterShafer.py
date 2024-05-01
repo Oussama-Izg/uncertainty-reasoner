@@ -156,3 +156,13 @@ if __name__ == '__main__':
     for k in joint_mass.keys():
         print(f"{k} = {round(joint_mass[k], 3)}")
     print(sum(joint_mass.values()))
+
+    m1 = MassFunction({'*': 0.4, 'ex:cn_type_1': 0.3, 'ex:cn_type_2': 0.3})
+    m2 = MassFunction({'*': 0.2, 'ex:cn_type_3': 0.4, 'ex:cn_type_4': 0.4})
+    m3 = MassFunction({'*': 0.4, 'ex:cn_type_5': 0.3, 'ex:cn_type_4': 0.3})
+
+    joint_mass = m1.join_masses(m2).get_mass_values()
+
+    for k in joint_mass.keys():
+        print(f"{k} = {round(joint_mass[k], 3)}")
+    print(sum(joint_mass.values()))

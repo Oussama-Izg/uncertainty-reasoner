@@ -254,7 +254,7 @@ class CertaintyAssignmentAxiom (Axiom):
         df_selected_triples.loc[df_selected_triples['_merge'] == 'both', 'weight'] = (1 - self.uncertainty_value) / df_selected_triples['count']
         df_selected_triples.loc[df_selected_triples['o'] == self.uncertainty_object, 'weight'] = self.uncertainty_value
 
-        df_selected_triples = df_selected_triples.drop(columns=['count'])
+        df_selected_triples = df_selected_triples.drop(columns=['count', '_merge'])
         df_selected_triples['weight'] = df_selected_triples['weight'].round(3)
 
         return pd.concat([df_selected_triples, df_triples])
@@ -450,7 +450,6 @@ class AFEDempsterShaferAxiom(Axiom):
                 result = pd.concat([result, df_issuer_subsets])
                 continue
             issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
-
             issuing_for_ignorance = self.ignorance
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
             if df_issuing_for_ignorance.shape[0] == 1:

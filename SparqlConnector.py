@@ -68,11 +68,12 @@ class SparqlBaseConnector(ABC):
         })
         df.loc[df['s.type'] == 'bnode', 's'] = "_:" + df['s']
         df.loc[df['o.type'] == 'bnode', 'o'] = "_:" + df['o']
-        df.loc[~df['o.datatype'].isna(), 'o'] = "\""+df['o']+"\"^^"+df['o.datatype']
         columns = df.columns.tolist()
-        if not 'model' in columns:
+        if 'o.datatype' in columns:
+            df.loc[~df['o.datatype'].isna(), 'o'] = "\"" + df['o'] + "\"^^" + df['o.datatype']
+        if 'model' not in columns:
             df['model'] = np.nan
-        if not 'weight' in columns:
+        if 'weight' not in columns:
             df['weight'] = 1.0
         df = df[['s', 'p', 'o', 'weight', 'model']]
         df['weight'] = df['weight'].astype('float64')
