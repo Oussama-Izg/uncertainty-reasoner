@@ -377,6 +377,8 @@ class CoinHoardDempsterShaferAxiom(Axiom):
             joint_mass = None
             for j, coin in df_hoard['o'].drop_duplicates().items():
                 df_time_interval_subsets = df_time_intervals[df_time_intervals['s'] == coin]
+                if df_time_interval_subsets.shape[0] == 0:
+                    continue
                 if joint_mass:
                     coin_type_mass_function = DempsterShafer.IntervalMassFunction(
                         DempsterShafer.interval_df_to_subset_dict(df_time_interval_subsets, self.ignorance,
@@ -386,6 +388,8 @@ class CoinHoardDempsterShaferAxiom(Axiom):
                     joint_mass = DempsterShafer.IntervalMassFunction(
                         DempsterShafer.interval_df_to_subset_dict(df_time_interval_subsets,self.ignorance,
                                                                   self.ignorance_object))
+            if joint_mass is None:
+                continue
             mass_values = {}
             for interval in joint_mass.get_mass_values():
                 if interval == '*':
