@@ -243,6 +243,7 @@ class ReificationSparqlConnector(SparqlBaseConnector):
         turtle_data += df_triples['predicate_turtle'].str.cat(sep="")
         turtle_data += df_triples['object_turtle'].str.cat(sep="")
         turtle_data += df_triples['weight_turtle'].str.cat(sep="")
+        turtle_data += df_triples['model_turtle'].str.cat(sep="")
 
         return turtle_data
 
