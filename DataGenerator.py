@@ -10,22 +10,22 @@ def generate_vague_similarity_data(n_coin_types, n_models):
     :return: Cartesian product of coin type combinations with random weight in internal dataframe format
     """
     result = pd.DataFrame()
-    for model_nr in range(1, n_models+1):
+    for model_nr in range(1, n_models + 1):
         cn_type_numbers = np.arange(1, n_coin_types + 1)
         # Create cartesian product
         df = pd.DataFrame({'from': cn_type_numbers}, index=np.repeat(0, n_coin_types))
         df = pd.merge(df, df, left_index=True, right_index=True)
         df = df.reset_index(drop=True)
 
-        df = df.rename(columns = {
+        df = df.rename(columns={
             'from_x': 's',
             'from_y': 'o'
         })
 
         # A similar B <-> B similar A so both should have the same value
         # Therefore, you remove the duplicates
-        df['tmp'] = df['s'].astype('string')+","+df['o'].astype('string')
-        df.loc[df['s'] < df['o'], 'tmp'] = df['o'].astype('string')+","+df['s'].astype('string')
+        df['tmp'] = df['s'].astype('string') + "," + df['o'].astype('string')
+        df.loc[df['s'] < df['o'], 'tmp'] = df['o'].astype('string') + "," + df['s'].astype('string')
         df = df.drop_duplicates(subset=['tmp'])
 
         # No self references
@@ -74,9 +74,10 @@ def generate_precise_certain_data(n_triples):
 
 def generate_type_triples(n_coins, n_coin_types):
     """
-    Generate precise/certain triples to test SPARQL connectors.
-    :param n_triples: Number of certain triples
-    :return: Dataframe in internal format with certain and precise triples
+    Generate type declaration triples for coins and coin types.
+    :param n_coins: Number of coins
+    :param n_coin_types: Number of coin types
+    :return: Dataframe containing the node types in internal format
     """
     coin_numbers = np.arange(1, n_coins + 1)
     coin_type_numbers = np.arange(1, n_coin_types + 1)
@@ -136,7 +137,7 @@ def generate_dst_input_data(n_coins, n_coin_types, n_models, uncertainty_object=
                 result_from.append("ex:coin_" + str(i))
                 result_to.append("ex:cn_type_" + str(choices[j]))
                 model.append("ex:model_" + str(m))
-                weights.append(max_weight/n_choices)
+                weights.append(max_weight / n_choices)
     if no_model:
         df = pd.DataFrame({'s': result_from, 'o': result_to, 'model': model, 'weight': weights})
     else:
@@ -172,7 +173,7 @@ def generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for, uncertainty_ob
         choices = np.random.choice(possible, size=n_choices, replace=False)
 
         for j in range(n_choices):
-            result_from.append("ex:issuing_for_" + str(i+1))
+            result_from.append("ex:issuing_for_" + str(i + 1))
             result_to.append("ex:issuer_" + str(choices[j]))
             result_predicate.append("ex:domain_knowledge")
     for i in range(n_coins):
@@ -181,13 +182,13 @@ def generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for, uncertainty_ob
         issuing_for_choices = np.random.choice(issuing_for_numbers, size=n_choices, replace=False)
         possible_issuers = set()
         for j in range(n_choices):
-            result_from.append("ex:coin_" + str(i+1))
+            result_from.append("ex:coin_" + str(i + 1))
             result_to.append("ex:issuing_for_" + str(issuing_for_choices[j]))
             result_predicate.append("ex:issuing_for")
             for issuer in issuing_for_possible_issuer_choices[j]:
                 possible_issuers.add(issuer)
         if np.random.rand() < 0.2:
-            result_from.append("ex:coin_" + str(i+1))
+            result_from.append("ex:coin_" + str(i + 1))
             result_to.append(uncertainty_object)
             result_predicate.append("ex:issuing_for")
 
@@ -195,11 +196,11 @@ def generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for, uncertainty_ob
         n_choices = np.random.randint(1, 4)
         issuer_choices = np.random.choice(list(possible_issuers), size=n_choices, replace=False)
         for j in range(n_choices):
-            result_from.append("ex:coin_" + str(i+1))
+            result_from.append("ex:coin_" + str(i + 1))
             result_to.append("ex:issuer_" + str(issuer_choices[j]))
             result_predicate.append("ex:issuer")
         if np.random.rand() < 0.2:
-            result_from.append("ex:coin_" + str(i+1))
+            result_from.append("ex:coin_" + str(i + 1))
             result_to.append(uncertainty_object)
             result_predicate.append("ex:issuer")
 
@@ -208,41 +209,3 @@ def generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for, uncertainty_ob
     df['model'] = np.nan
 
     return df
-
-
-def generate_coin_hoard_use_case_input(n_coin_hoards: int, n_coin_types: int):
-    result_from = []
-    result_predicate = []
-    result_to = []
-    coin_counter = 1
-    for i in range(n_coin_hoards):
-        n_coin_hoard_coins = np.random.randint(3, 11)
-        for j in range(n_coin_hoard_coins):
-            result_from.append("ex:coin_hoard_" + str(i + 1))
-            result_to.append("ex:coin_" + str(coin_counter))
-            result_predicate.append("ex:containsCoin")
-            coin_counter += 1
-    for i in range(n_coin_types):
-        result_from.append("ex:coin_type_" + str(coin_counter))
-        result_to.append(f"_:b{i}")
-        result_predicate.append("ex:hasTimeInterval")
-
-        interval_start = np.random.randint(-200, 1)
-        interval_end = np.random.randint(interval_start, 1)
-        result_to.append(f"\"{interval_start}\"^^xsd:integer")
-        result_from.append(f"_:b{i}")
-        result_predicate.append("ex:intervalStart")
-
-        result_to.append(f"\"{interval_end}\"^^xsd:integer")
-        result_from.append(f"_:b{i}")
-        result_predicate.append("ex:intervalEnd")
-    df = pd.DataFrame({'s': result_from, 'o': result_to, 'p': result_predicate})
-    df['weight'] = 1
-    df['model'] = np.nan
-
-    df = pd.concat([df, generate_dst_input_data(coin_counter, n_coin_types, 1, no_model=True)],
-                   ignore_index=True)
-
-    return df
-
-

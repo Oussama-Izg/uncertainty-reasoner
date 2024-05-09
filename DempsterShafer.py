@@ -18,6 +18,35 @@ class IntervalMassFunction:
         """
         return self._mass_values.copy()
 
+    def get_beliefs(self):
+        result = {}
+        for subset1 in self._mass_values:
+            if subset1 == '*':
+                result['*'] = 1.0
+                continue
+            for subset2 in self._mass_values:
+                if subset2 == '*':
+                    continue
+                # Check if subset2 is included and thus a subset of subset1
+                if subset2[0] >= subset1[0] and subset2[1] <= subset1[1]:
+                    result[subset1] = result.get(subset1, 0) + self._mass_values[subset2]
+        return result
+
+    def get_plausibility_values(self):
+        result = {}
+        for subset1 in self._mass_values:
+            if subset1 == '*':
+                result['*'] = 1.0
+                continue
+            for subset2 in self._mass_values:
+                if subset2 == '*':
+                    result[subset1] = result.get(subset1, 0) + self._mass_values[subset2]
+                    continue
+                intersecting_interval = get_intersection(subset1, subset2)
+                if intersecting_interval is not None:
+                    result[subset1] = result.get(subset1, 0) + self._mass_values[subset2]
+        return result
+
     def join_masses(self, m: 'IntervalMassFunction') -> 'IntervalMassFunction':
         """
         Join two masses via the Dempster-Shafer combination rule. Only supports subsets with continuous
@@ -117,8 +146,7 @@ def interval_df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncer
     :param uncertainty_object: The uncertainty object that indicates ignorance
     :return: Subset as dict
     """
-    result = {}
-    result['*'] = default_ignorance
+    result = {'*': default_ignorance}
     n = df[df['o'] != uncertainty_object].shape[0]
     for i, x in df.iterrows():
         if x['o'] == uncertainty_object:
@@ -151,10 +179,13 @@ if __name__ == '__main__':
     m2 = IntervalMassFunction({'*': 0.2, (-73, -72): 0.8 / 3, (-85, -70): 0.8 / 3, (-100, -73): 0.8 / 3})
     m3 = IntervalMassFunction({'*': 0.4, (-80, -75): 0.6})
 
-    joint_mass = m1.join_masses(m2).join_masses(m3).get_mass_values()
+    combined_mass = m1.join_masses(m2).join_masses(m3)
+    joint_mass = combined_mass.get_mass_values()
+    plausibilities = combined_mass.get_plausibility_values()
+    beliefs = combined_mass.get_beliefs()
 
     for k in joint_mass.keys():
-        print(f"{k} = {round(joint_mass[k], 3)}")
+        print(f"{k} = {round(joint_mass[k], 3)}, {round(beliefs[k], 3)}, {round(plausibilities[k], 3)}")
     print(sum(joint_mass.values()))
 
     m1 = MassFunction({'*': 0.4, 'ex:cn_type_1': 0.3, 'ex:cn_type_2': 0.3})

@@ -17,7 +17,7 @@ QUERY_ENDPOINT = "http://localhost:3030/test/query"
 UPDATE_ENDPOINT = "http://localhost:3030/test/update"
 GSP_ENDPOINT = "http://localhost:3030/test/data"
 
-def sparql_test_reification(n=1000):
+def sparql_test_reification(n=500):
     conn = SparqlConnector.ReificationSparqlConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
                                                GSP_ENDPOINT)
@@ -37,13 +37,15 @@ def sparql_test_reification(n=1000):
     logger.info(f"Done in {end - start} seconds. Inserted {df.shape[0]} rows.")
     logger.info("Querying data")
     start = time.time()
-    count = conn.download_df()[0].shape[0]
+    df = conn.download_df()[0]
+    df.to_csv('export.csv', index=False)
+    count = df.shape[0]
     end = time.time()
     # 23.52 1498500
     logger.info(f"Done in {end - start} seconds. Queried {count} rows.")
 
 
-def sparql_test_sparql_star(n=1000):
+def sparql_test_sparql_star(n=500):
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
                                                GSP_ENDPOINT)
@@ -63,7 +65,9 @@ def sparql_test_sparql_star(n=1000):
     logger.info(f"Done in {end - start} seconds. Inserted {df.shape[0]} rows.")
     logger.info("Querying data")
     start = time.time()
-    count = conn.download_df()[0].shape[0]
+    df = conn.download_df()[0]
+    df.to_csv('export.csv', index=False)
+    count = df.shape[0]
     end = time.time()
     # 23.52 1498500
     logger.info(f"Done in {end - start} seconds. Queried {count} rows.")
@@ -169,58 +173,6 @@ def reasoner_test_DST_axiom_handcrafted():
     logger.info("Writing output to output/dst_test.csv")
 
     reasoner.get_triples_as_df().sort_values(by=['s', 'p', 'o']).to_csv('output/dst_test.csv', index=False)
-
-
-def reasoner_test_coin_hoard_axiom_handcrafted():
-    logger.info("Generating data")
-    df_coin_hoard_input = pd.read_csv('data/coin_hoard_test.csv')
-
-    conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
-                                               UPDATE_ENDPOINT,
-                                               GSP_ENDPOINT)
-    logger.info("Deleting old data")
-    conn.delete_query(delete_all=True)
-    logger.info("Uploading data")
-    conn.upload_df(df_coin_hoard_input)
-    axioms = [
-        Reasoner.CoinHoardDempsterShaferAxiom()
-    ]
-
-    reasoner = Reasoner.Reasoner(axioms)
-    reasoner.load_data_from_endpoint(conn)
-    reasoner.reason()
-
-    logger.info("Writing output to output/dst_test.csv")
-
-    reasoner.get_triples_as_df().to_csv('output/coin_hoard_test.csv', index=False)
-
-
-def reasoner_test_coin_hoard_axiom_synthetic(n_coin_hoards, n_coin_types, iterations):
-    logger.info("Generating data")
-    df_coin_hoard_input = DataGenerator.generate_coin_hoard_use_case_input(n_coin_hoards, n_coin_types)
-
-    conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
-                                               UPDATE_ENDPOINT,
-                                               GSP_ENDPOINT)
-    conn.delete_query(delete_all=True)
-    conn.upload_df(df_coin_hoard_input)
-    axioms = [
-        Reasoner.CoinHoardDempsterShaferAxiom()
-    ]
-
-    time_sum = 0
-    data_retrieval_time_sum = 0
-    for i in range(iterations):
-        start = time.time()
-        reasoner = Reasoner.Reasoner(axioms)
-        reasoner.load_data_from_endpoint(conn)
-        end = time.time()
-        data_retrieval_time_sum += end - start
-        reasoner.reason()
-        end = time.time()
-        time_sum += end - start
-
-    return time_sum / iterations, data_retrieval_time_sum / iterations
 
 
 def reasoner_test_uncertainty_assignment_axiom_sythetic(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
@@ -486,25 +438,23 @@ if __name__ == '__main__':
     print("4: Test Use Case 1 with similarity models from multiple models (handcrafted)")
     print("5: Test Use Case 2 with coin types from multiple models (synthetic, benchmark)")
     print("6: Test Use Case 2 with coin types from multiple models (handcrafted)")
-    print("7: Test Use Case 3 with coin hoards (synthetic, benchmark)")
-    print("8: Test Use Case 3 with coin hoards (handcrafted)")
-    print("9: Test Use Case 4 with certainty assignments to triple alternatives (synthetic, benchmark)")
-    print("10: Test Use Case 4 with certainty assignments to triple alternatives (handcrafted)")
-    print("11: Test Use Case 5 with AFE DST (synthetic, benchmark)")
-    print("12: Test Use Case 5 with AFE DST (handcrafted)")
-    print("13: Test Use Case 5 with AFE DST (real data)")
-    print("14: Test Use Case 6 similarity chain rules (synthetic, benchmark)")
-    print("15: Test Use Case 6 similarity chain rules while removing one chain rule (synthetic, benchmark)")
-    print("16: Test Use Case 6 similarity chain rules (handcrafted)")
+    print("7: Test Use Case 4 with certainty assignments to triple alternatives (synthetic, benchmark)")
+    print("8: Test Use Case 4 with certainty assignments to triple alternatives (handcrafted)")
+    print("9: Test Use Case 5 with AFE DST (synthetic, benchmark)")
+    print("10: Test Use Case 5 with AFE DST (handcrafted)")
+    print("11: Test Use Case 5 with AFE DST (real data)")
+    print("12: Test Use Case 6 similarity chain rules (synthetic, benchmark)")
+    print("13: Test Use Case 6 similarity chain rules while removing one chain rule (synthetic, benchmark)")
+    print("14: Test Use Case 6 similarity chain rules (handcrafted)")
 
     selection = -1
     while True:
         try:
             selection = int(input("Select the test by typing the number: "))
-            if 0 < selection <= 16:
+            if 0 < selection <= 14:
                 break
             else:
-                print("Selected number must be between 1 and 16")
+                print("Selected number must be between 1 and 14")
         except ValueError:
             print("This is not a number. Try again.")
 
@@ -535,7 +485,7 @@ if __name__ == '__main__':
         else:
             conn_type = 'reification'
 
-        coin_type_numbers = [200, 400, 600, 800, 1000, 1200, 1400]
+        coin_type_numbers = [100, 200, 300, 400, 500, 600, 700, 800]
         means = []
         data_retrieval_means = []
         for coin_type_number in coin_type_numbers:
@@ -544,62 +494,51 @@ if __name__ == '__main__':
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_type_number} coins.")
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+
+        print(f"x = np.array({str(coin_type_numbers)})")
+        print(f"y = np.array({str(means)})")
+        print(f"y2 = np.array({str(data_retrieval_means)})")
     elif selection == 4:
         reasoner_test_aggregation_mean_handcrafted()
     elif selection == 5:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-        coin_type_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+        coin_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
         means = []
         data_retrieval_means = []
         triple_numbers = []
-        for coin_type_number in coin_type_numbers:
-            mean_time, data_retrieval_mean_time, n_triples = reasoner_test_dst_axiom_synthetic(coin_type_number, 1000, 10)
+        for coin_number in coin_numbers:
+            mean_time, data_retrieval_mean_time, n_triples = reasoner_test_dst_axiom_synthetic(coin_number, 1000, 10)
             triple_numbers.append(n_triples)
             means.append(mean_time)
             data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_type_number} coins.")
+            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(means)
-        print(data_retrieval_means)
+        print(f"x = np.array({str(coin_numbers)})")
+        print(f"y = np.array({str(means)})")
+        print(f"y2 = np.array({str(data_retrieval_means)})")
     elif selection == 6:
         reasoner_test_DST_axiom_handcrafted()
     elif selection == 7:
         # Disable logging messages for the reasoner
-        #logging.getLogger('Reasoner').setLevel(logging.WARNING)
-
-        coin_hoard_numbers = [1000, 2000]
-        means = []
-        data_retrieval_means = []
-        for coin_hoard_number in coin_hoard_numbers:
-            mean_time, data_retrieval_mean_time = reasoner_test_coin_hoard_axiom_synthetic(coin_hoard_number, 1000, 10)
-            means.append(mean_time)
-            data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_hoard_number} coin hoards.")
-            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(means)
-        print(data_retrieval_means)
-    elif selection == 8:
-        reasoner_test_coin_hoard_axiom_handcrafted()
-    elif selection == 9:
-        # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-        coin_type_numbers = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
+        coin_numbers = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
         means = []
         data_retrieval_means = []
-        for coin_type_number in coin_type_numbers:
-            mean_time, data_retrieval_mean_time = reasoner_test_uncertainty_assignment_axiom_sythetic(coin_type_number, 100, 100, 10)
+        for coin_number in coin_numbers:
+            mean_time, data_retrieval_mean_time = reasoner_test_uncertainty_assignment_axiom_sythetic(coin_number, 100, 100, 10)
             means.append(mean_time)
             data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_type_number} coins.")
+            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(means)
-        print(data_retrieval_means)
-    elif selection == 10:
+        print(f"x = np.array({str(coin_numbers)})")
+        print(f"y = np.array({str(means)})")
+        print(f"y2 = np.array({str(data_retrieval_means)})")
+    elif selection == 8:
         reasoner_test_uncertainty_assignment_axiom_handcrafted()
-    elif selection == 11:
+    elif selection == 9:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -612,13 +551,14 @@ if __name__ == '__main__':
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(means)
-        print(data_retrieval_means)
-    elif selection == 12:
+        print(f"x = np.array({str(coin_numbers)})")
+        print(f"y = np.array({str(means)})")
+        print(f"y2 = np.array({str(data_retrieval_means)})")
+    elif selection == 10:
         reasoner_test_AFE_DST_handcrafted()
-    elif selection == 13:
+    elif selection == 11:
         reasoner_test_AFE_DST_real_data()
-    elif selection == 14:
+    elif selection == 12:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -631,9 +571,10 @@ if __name__ == '__main__':
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(means)
-        print(data_retrieval_means)
-    elif selection == 15:
+        print(f"x = np.array({str(coin_numbers)})")
+        print(f"y = np.array({str(means)})")
+        print(f"y2 = np.array({str(data_retrieval_means)})")
+    elif selection == 13:
         # Disable logging messages for the reasoner
         logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -646,8 +587,9 @@ if __name__ == '__main__':
             data_retrieval_means.append(data_retrieval_mean_time)
             print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
             print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(means)
-        print(data_retrieval_means)
-    elif selection == 16:
+        print(f"x = np.array({str(coin_numbers)})")
+        print(f"y = np.array({str(means)})")
+        print(f"y2 = np.array({str(data_retrieval_means)})")
+    elif selection == 14:
         reasoner_test_chain_rule_handcrafted()
 
