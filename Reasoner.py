@@ -134,7 +134,7 @@ class Reasoner:
         """
         return self._df_triples
 
-    def save_data_to_file(self, file_name, conn: SparqlBaseConnector, only_new: bool = False) -> None:
+    def save_data_to_file(self, file_name: str, conn: SparqlBaseConnector, only_new: bool = False) -> None:
         """
         Write triples to turtle file
         :param file_name: File name
@@ -159,7 +159,6 @@ class Reasoner:
             conn.upload_df(self._df_triples[self._df_triples['model'] == self._reasoner_name])
         else:
             conn.upload_df(self._df_triples)
-
 
 
 class Axiom(ABC):
@@ -226,7 +225,7 @@ class CertaintyAssignmentAxiom (Axiom):
     """
     Uses a heuristic to assign certainty weights to triples.
     """
-    def __init__(self, predicate, uncertainty_object="ex:uncertain", uncertainty_value=0.2):
+    def __init__(self, predicate: str, uncertainty_object: str = "ex:uncertain", uncertainty_value: float = 0.2):
         """
         :param predicate: The predicate to use
         :param uncertainty_object: Object indicating uncertainty about the selection
@@ -265,7 +264,7 @@ class DempsterShaferAxiom(Axiom):
     Implements a simple Dempster-Shafer combination rule to combine the weights (evidences) from multiple models. Should
     only be used for certainty weights.
     """
-    def __init__(self, predicate, ignorance_object='ex:uncertain', ignorance=0.2):
+    def __init__(self, predicate: str, ignorance_object: str = 'ex:uncertain', ignorance: float = 0.2):
         """
         :param predicate: Predicate to aggregate
         :param ignorance_object: Object that increases ignorance for the mass function
@@ -329,7 +328,7 @@ class AFEDempsterShaferAxiom(Axiom):
     """
     def __init__(self, issuer_predicate: str = 'ex:issuer', issuing_for_predicate: str = 'ex:issuing_for',
                  domain_knowledge_predicate: str = 'ex:domain_knowledge', ignorance_object: str = 'ex:uncertain',
-                 ignorance=0.2):
+                 ignorance: float = 0.2):
         """
         :param issuer_predicate: Issuer predicate
         :param issuing_for_predicate: Issuing for predicate
@@ -445,8 +444,8 @@ class ChainRuleAxiom(Axiom):
     """
     Implements a modified version of the chain rule axiom from the Academic Meta Tool.
     """
-    def __init__(self, antecedent1, antecedent2, consequent, reasoning_logic: Literal['product', 'goedel', 'lukasiewicz'], sum_values=False, class_1=None, class_2=None,
-                 class_3=None, input_threshold=None, output_threshold=None):
+    def __init__(self, antecedent1: str, antecedent2: str, consequent: str, reasoning_logic: Literal['product', 'goedel', 'lukasiewicz'], sum_values: bool = False, class_1: str = None, class_2: str = None,
+                 class_3: str = None, input_threshold: float = None, output_threshold: float = None):
         """
 
         :param antecedent1: First antecedent predicate: A antecedent1 B
@@ -513,7 +512,7 @@ class ChainRuleAxiom(Axiom):
             df_result['weight'] = df_result['weight_x']
             df_result.loc[df_result['certainty_x'] > df_result['weight_y'], 'weight'] = df_result['weight_y']
         elif self.reasoning_logic == 'lukasiewicz':
-            df_result['weight'] = df_result['weight_x'] + df_result['weight_x'] - 1.0
+            df_result['weight'] = df_result['weight_x'] + df_result['weight_y'] - 1.0
             df_result.loc[0 > df_result['weight'], 'weight'] = 0.0
         else:
             raise ValueError("Reasoning logic must be product, goedel or lukasiewicz.")
@@ -548,7 +547,7 @@ class DisjointAxiom(Axiom):
     """
     Axiom to add a constraint that disallows two predicate to have the same subject and object.
     """
-    def __init__(self, predicate1, predicate2, throw_exception=True, keep_predicate1=True):
+    def __init__(self, predicate1: str, predicate2: str, throw_exception: bool = True, keep_predicate1: bool = True):
         """
         :param predicate1: First predicate
         :param predicate2: Second predicate
@@ -591,7 +590,7 @@ class SelfDisjointAxiom(Axiom):
     """
     Constraint axiom to disallow self-referencing for a given predicate
     """
-    def __init__(self, predicate, throw_exception=True):
+    def __init__(self, predicate: str, throw_exception: bool = True):
         """
 
         :param predicate: Predicate to disallow self-referencing for
