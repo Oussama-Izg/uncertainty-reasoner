@@ -264,14 +264,18 @@ class DempsterShaferAxiom(Axiom):
     Implements a simple Dempster-Shafer combination rule to combine the weights (evidences) from multiple models. Should
     only be used for certainty weights.
     """
-    def __init__(self, predicate: str, ignorance_object: str = 'ex:uncertain', ignorance: float = 0.2):
+    def __init__(self, predicate: str, ignorance_object: str = 'ex:uncertain', ignorance: dict[str, float] = None,
+                 default_ignorance: float = 0.2):
         """
         :param predicate: Predicate to aggregate
         :param ignorance_object: Object that increases ignorance for the mass function
-        :param ignorance: Default ignorance
+        :param default_ignorance: Default ignorance
         """
         super().__init__("preprocessing")
+        if ignorance is None:
+            ignorance = {}
         self.predicate = predicate
+        self.default_ignorance = default_ignorance
         self.ignorance = ignorance
         self.ignorance_object = ignorance_object
 
@@ -290,11 +294,12 @@ class DempsterShaferAxiom(Axiom):
                 continue
 
             for j, model in df_subsets['model'].drop_duplicates().items():
+                ignorance = self.ignorance.get(model, self.default_ignorance)
                 df_model_subsets = df_subsets[df_subsets['model'] == model]
                 if joint_mass_function is None:
-                    joint_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_model_subsets, self.ignorance, self.ignorance_object))
+                    joint_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_model_subsets, ignorance, self.ignorance_object))
                 else:
-                    joint_mass_function = joint_mass_function.join_masses(DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_model_subsets, self.ignorance, self.ignorance_object)))
+                    joint_mass_function = joint_mass_function.join_masses(DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_model_subsets, ignorance, self.ignorance_object)))
 
             mass_values = joint_mass_function.get_mass_values()
             result_tmp = {
