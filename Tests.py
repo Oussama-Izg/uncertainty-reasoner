@@ -17,7 +17,14 @@ QUERY_ENDPOINT = "http://localhost:3030/test/query"
 UPDATE_ENDPOINT = "http://localhost:3030/test/update"
 GSP_ENDPOINT = "http://localhost:3030/test/data"
 
+
 def sparql_test_reification(n=500):
+    """
+    Test SPARQL endpoint with reification triples. Generates around n*n rows in internal format and thus n*n*5 triples.
+    :param n: Amount of coin types.
+    :return:
+    """
+
     conn = SparqlConnector.ReificationSparqlConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
                                                GSP_ENDPOINT)
@@ -46,6 +53,11 @@ def sparql_test_reification(n=500):
 
 
 def sparql_test_sparql_star(n=500):
+    """
+    Test SPARQL endpoint with RDF-star triples. Generates around n*n rows in internal format and thus n*n*3 triples.
+    :param n: Amount of coin types.
+    :return:
+    """
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
                                                GSP_ENDPOINT)
@@ -74,6 +86,10 @@ def sparql_test_sparql_star(n=500):
 
 
 def reasoner_test_aggregation_mean_handcrafted():
+    """
+    Test AggregationAxiom on handcrafted data.
+    :return:
+    """
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
                                                GSP_ENDPOINT)
@@ -91,7 +107,15 @@ def reasoner_test_aggregation_mean_handcrafted():
 
     reasoner.get_triples_as_df().to_csv('output/agg_mean_test.csv', index=False)
 
+
 def reasoner_test_aggregation_mean(n_coin_types: int, iterations: int, conn_type='rdf-star'):
+    """
+    Test AggregationAxiom with synthetic data. Creates n*n rows in internal format.
+    :param n_coin_types: Amount of coin types
+    :param iterations: Amount of iterations to create the mean.
+    :param conn_type: rdf-star or reification
+    :return:
+    """
     if conn_type == 'rdf-star':
         conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                    UPDATE_ENDPOINT,
@@ -124,6 +148,13 @@ def reasoner_test_aggregation_mean(n_coin_types: int, iterations: int, conn_type
 
 
 def reasoner_test_dst_axiom_synthetic(n_coins: int, n_coin_types: int, iterations: int):
+    """
+    Test DempsterShaferAxiom with synthetic data.
+    :param n_coins: Amount of coins
+    :param n_coin_types: Amount of coin types
+    :param iterations: Amount of iterations to create the mean.
+    :return:
+    """
     df_dst_input = DataGenerator.generate_dst_input_data(n_coins, n_coin_types, 3)
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -151,6 +182,10 @@ def reasoner_test_dst_axiom_synthetic(n_coins: int, n_coin_types: int, iteration
 
 
 def reasoner_test_DST_axiom_handcrafted():
+    """
+    Test DempsterShaferAxiom with handcrafted data.
+    :return:
+    """
     logger.info("Generating data")
     df_dst_input = pd.read_csv('data/dst_test.csv')
 
@@ -176,6 +211,14 @@ def reasoner_test_DST_axiom_handcrafted():
 
 
 def reasoner_test_uncertainty_assignment_axiom_sythetic(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
+    """
+    Test CertaintyAssignmentAxiom with synthetic data.
+    :param n_coins: Number of coins
+    :param n_issuer: Number of issuer
+    :param n_issuing_for: Number of depicted persons
+    :param iterations: Number of iterations
+    :return:
+    """
     df_afe = DataGenerator.generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for)
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -186,6 +229,7 @@ def reasoner_test_uncertainty_assignment_axiom_sythetic(n_coins: int, n_issuer: 
     axioms = [
         Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
         Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
+        Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge"),
     ]
 
     time_sum = 0
@@ -204,6 +248,10 @@ def reasoner_test_uncertainty_assignment_axiom_sythetic(n_coins: int, n_issuer: 
 
 
 def reasoner_test_uncertainty_assignment_axiom_handcrafted():
+    """
+    Test CertaintyAssignmentAxiom with handcrafted data.
+    :return:
+    """
     df_afe = pd.read_csv('data/afe_test_data.csv')
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -214,6 +262,7 @@ def reasoner_test_uncertainty_assignment_axiom_handcrafted():
     axioms = [
         Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
         Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
+        Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge"),
     ]
 
 
@@ -225,6 +274,14 @@ def reasoner_test_uncertainty_assignment_axiom_handcrafted():
 
 
 def reasoner_test_AFE_DST_synthetic(n_coins: int, n_issuer: int, n_issuing_for: int, iterations: int):
+    """
+    Test AFEDempsterShaferAxiom with synthetic data.
+    :param n_coins: Number of coins
+    :param n_issuer: Number of issuer
+    :param n_issuing_for: Number of depicted persons
+    :param iterations: Number of iterations
+    :return:
+    """
     df_afe = DataGenerator.generate_afe_dst_input_data(n_coins, n_issuer, n_issuing_for)
 
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
@@ -235,6 +292,7 @@ def reasoner_test_AFE_DST_synthetic(n_coins: int, n_issuer: int, n_issuing_for: 
     axioms = [
         Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
         Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
+        Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge"),
         Reasoner.AFEDempsterShaferAxiom('ex:issuer', 'ex:issuing_for', 'ex:domain_knowledge')
     ]
 
@@ -252,7 +310,12 @@ def reasoner_test_AFE_DST_synthetic(n_coins: int, n_issuer: int, n_issuing_for: 
 
     return time_sum / iterations, data_retrieval_time_sum / iterations
 
+
 def reasoner_test_AFE_DST_handcrafted():
+    """
+    Test AFEDempsterShaferAxiom with handcrafted data.
+    :return:
+    """
     df_afe = pd.read_csv('data/afe_test_data.csv')
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
@@ -273,6 +336,10 @@ def reasoner_test_AFE_DST_handcrafted():
 
 
 def reasoner_test_AFE_DST_real_data():
+    """
+    Test AFEDempsterShaferAxiom with real AFE data.
+    :return:
+    """
     df_afe = pd.read_csv('data/afe_input.csv')
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
@@ -294,6 +361,10 @@ def reasoner_test_AFE_DST_real_data():
 
 
 def reasoner_test_chain_rule_handcrafted():
+    """
+    Test chain rule use case with handcrafted data.
+    :return:
+    """
     df_chain_rule = pd.read_csv('data/chain_rule_test.csv')
     conn = SparqlConnector.SparqlStarConnector(QUERY_ENDPOINT,
                                                UPDATE_ENDPOINT,
@@ -326,6 +397,13 @@ def reasoner_test_chain_rule_handcrafted():
 
 
 def reasoner_test_chain_rule_synthetic(n_coins, n_coin_types, iterations):
+    """
+    Test chain rule use case with synthetic data.
+    :param n_coins: Number of coins
+    :param n_coin_types: Number of coin types
+    :param iterations: Number of iterations
+    :return:
+    """
     df_dst_input = DataGenerator.generate_dst_input_data(n_coins, n_coin_types, 3)
     df_similarity_input = DataGenerator.generate_vague_similarity_data(n_coin_types, 3)
     df_types = DataGenerator.generate_type_triples(n_coins, n_coin_types)
@@ -385,6 +463,13 @@ def reasoner_test_chain_rule_synthetic(n_coins, n_coin_types, iterations):
 
 
 def reasoner_test_chain_rule_part_synthetic(n_coins, n_coin_types, iterations):
+    """
+    Test chain rule use case with synthetic data.
+    :param n_coins: Number of coins
+    :param n_coin_types: Number of coin types
+    :param iterations: Number of iterations
+    :return:
+    """
     df_dst_input = DataGenerator.generate_dst_input_data(n_coins, n_coin_types, 3)
     df_similarity_input = DataGenerator.generate_vague_similarity_data(n_coin_types, 3)
     df_types = DataGenerator.generate_type_triples(n_coins, n_coin_types)

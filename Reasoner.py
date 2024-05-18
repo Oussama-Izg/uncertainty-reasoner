@@ -78,7 +78,7 @@ class Reasoner:
 
         return df_result
 
-    def reason(self):
+    def reason(self) -> None:
         """
         Start the reasoning process. All preprocessing axioms are applied once. The chain rule axioms are apllied until
         the weights don't change or the maximum number of iterations is reached. Then the post-processing axioms are

@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Optional
 
 import pandas as pd
 
@@ -8,17 +8,21 @@ class IntervalMassFunction:
     Implements a simpler mass function for the Dempster-Shafer-Theory. It only supports subsets with continuous
     intervals like 2...9 or all elements ("*" subset).
     """
-    def __init__(self, mass_values: dict[Tuple[int, int], float]):
+    def __init__(self, mass_values: dict[tuple[int, int], float]):
         self._mass_values = mass_values
 
-    def get_mass_values(self) -> dict[Tuple[int, int], float]:
+    def get_mass_values(self) -> dict[tuple[int, int], float]:
         """
         Get the mass values
         :return: Mass value dict
         """
         return self._mass_values.copy()
 
-    def get_beliefs(self):
+    def get_beliefs(self) -> dict[tuple[int, int], float]:
+        """
+        Calculate the belief values
+        :return: Belief values
+        """
         result = {}
         for subset1 in self._mass_values:
             if subset1 == '*':
@@ -32,7 +36,11 @@ class IntervalMassFunction:
                     result[subset1] = result.get(subset1, 0) + self._mass_values[subset2]
         return result
 
-    def get_plausibility_values(self):
+    def get_plausibility_values(self) -> dict[tuple[int, int], float]:
+        """
+        Calculate the plausibility values
+        :return: Plausibility values
+        """
         result = {}
         for subset1 in self._mass_values:
             if subset1 == '*':
@@ -79,7 +87,7 @@ class IntervalMassFunction:
         return IntervalMassFunction(result)
 
 
-def get_intersection(a: Tuple[int, int], b: Tuple[int, int]) -> Optional[Tuple[int, int]]:
+def get_intersection(a: tuple[int, int], b: tuple[int, int]) -> Optional[tuple[int, int]]:
     """
     Get intersection of two intervals. Based on
     https://scicomp.stackexchange.com/questions/26258/the-easiest-way-to-find-intersection-of-two-intervals
@@ -137,8 +145,36 @@ class MassFunction:
 
         return MassFunction(result)
 
+    def get_beliefs(self) -> dict[str, float]:
+        """
+        Calculate the belief values
+        :return: Belief values
+        """
+        result = {}
+        for subset in self._mass_values:
+            if subset == '*':
+                result['*'] = 1.0
+                continue
+            else:
+                result[subset] = self._mass_values[subset]
+        return result
 
-def interval_df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncertainty_object: str) -> dict[Tuple[int, int], float]:
+    def get_plausibility_values(self) -> dict[str, float]:
+        """
+        Calculate the plausibility values
+        :return: Plausibility values
+        """
+        result = {}
+        for subset in self._mass_values:
+            if subset == '*':
+                result['*'] = 1.0
+                continue
+            else:
+                result[subset] = self._mass_values[subset] + self._mass_values.get('*', 0)
+        return result
+
+
+def interval_df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncertainty_object: str) -> dict[tuple[int, int], float]:
     """
     Translate dataframe to a subset dict
     :param df: The dataframe to translate
@@ -180,6 +216,18 @@ if __name__ == '__main__':
     m3 = IntervalMassFunction({'*': 0.4, (-80, -75): 0.6})
 
     combined_mass = m1.join_masses(m2).join_masses(m3)
+    joint_mass = combined_mass.get_mass_values()
+    plausibilities = combined_mass.get_plausibility_values()
+    beliefs = combined_mass.get_beliefs()
+
+    for k in joint_mass.keys():
+        print(f"{k} = {round(joint_mass[k], 3)}, {round(beliefs[k], 3)}, {round(plausibilities[k], 3)}")
+    print(sum(joint_mass.values()))
+
+    m1 = MassFunction({'*': 0.4, 'A': 0.3, 'B': 0.3})
+    m2 = MassFunction({'*': 0.1, 'C': 0.9})
+
+    combined_mass = m1.join_masses(m2)
     joint_mass = combined_mass.get_mass_values()
     plausibilities = combined_mass.get_plausibility_values()
     beliefs = combined_mass.get_beliefs()
