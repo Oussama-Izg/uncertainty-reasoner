@@ -157,6 +157,25 @@ class SparqlBaseConnector(ABC):
         df = df.replace(prefix_mapping, regex=True)
         return df
 
+    def combine_dataframes(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
+        """
+        Combine df_triples with df_classes.
+        :param df_triples: Normal triples dataframe without class triples
+        :param df_classes: Class triples dataframe
+        :return: df_triples with class declarations
+        """
+
+        df_tmp = df_classes.copy()
+        df_tmp = df_tmp.rename(columns={
+            'node': 's',
+            'class': 'o'
+        })
+        df_tmp['p'] = self._class_predicate
+        df_tmp['weight'] = 1.0
+
+        return pd.concat([df_triples, df_tmp], ignore_index=True)
+
+
     @abstractmethod
     def df_to_turtle(self, df_triples: pd.DataFrame) -> str:
         """

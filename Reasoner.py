@@ -144,9 +144,10 @@ class Reasoner:
         """
         with open(file_name, "rw") as f:
             if only_new:
-                f.write(conn.df_to_turtle(self._df_triples[self._df_triples['model'] == self._reasoner_name]))
+                result = self._df_triples[self._df_triples['model'] == self._reasoner_name]
             else:
-                f.write(conn.df_to_turtle(self._df_triples))
+                result = conn.combine_dataframes(self._df_triples, self._df_classes)
+            f.write(conn.df_to_turtle(result))
 
     def upload_data_to_endpoint(self, conn: SparqlBaseConnector, only_new: bool = False) -> None:
         """
@@ -156,9 +157,10 @@ class Reasoner:
         :return:
         """
         if only_new:
-            conn.upload_df(self._df_triples[self._df_triples['model'] == self._reasoner_name])
+            result = self._df_triples[self._df_triples['model'] == self._reasoner_name]
         else:
-            conn.upload_df(self._df_triples)
+            result = conn.combine_dataframes(self._df_triples, self._df_classes)
+        conn.upload_df(result)
 
 
 class Axiom(ABC):

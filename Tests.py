@@ -532,7 +532,7 @@ if __name__ == '__main__':
     print("12: Test Use Case 6 similarity chain rules (synthetic, benchmark)")
     print("13: Test Use Case 6 similarity chain rules while removing one chain rule (synthetic, benchmark)")
     print("14: Test Use Case 6 similarity chain rules (handcrafted)")
-    Path("output").mkdir(parents=True, exist_ok=True)
+    Path("output").mkdir(exist_ok=True)
 
     selection = -1
     while True:
