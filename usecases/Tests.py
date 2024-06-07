@@ -46,7 +46,6 @@ def sparql_test_reification(n=500):
     logger.info("Querying data")
     start = time.time()
     df = conn.download_df()[0]
-    df.to_csv('export.csv', index=False)
     count = df.shape[0]
     end = time.time()
     # 23.52 1498500
@@ -79,7 +78,6 @@ def sparql_test_sparql_star(n=500):
     logger.info("Querying data")
     start = time.time()
     df = conn.download_df()[0]
-    df.to_csv('export.csv', index=False)
     count = df.shape[0]
     end = time.time()
     # 23.52 1498500
