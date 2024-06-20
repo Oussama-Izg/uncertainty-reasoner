@@ -1,7 +1,6 @@
-import DataGenerator
+from usecases import DataGenerator
 import Reasoner
 import SparqlConnector
-import logging
 from pathlib import Path
 import time
 import pandas as pd
@@ -543,138 +542,140 @@ if __name__ == '__main__':
         except ValueError:
             print("This is not a number. Try again.")
 
-    if selection == 1:
-        sparql_test_reification()
-    elif selection == 2:
-        sparql_test_sparql_star()
-    elif selection == 3:
-        # Disable logging messages for the reasoner
-        logging.getLogger('Reasoner').setLevel(logging.WARNING)
+    match selection:
 
-        print("Please select the connection type:")
-        print("1: RDF-star")
-        print("2: Reification")
+        case 1:
+            sparql_test_reification()
+        case 2:
+            sparql_test_sparql_star()
+        case 3:
+            # Disable logging messages for the reasoner
+            logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-        selection = -1
-        while True:
-            try:
-                selection = int(input("Select the test by typing the number: "))
-                if 0 < selection <= 2:
-                    break
-                else:
-                    print("Selected number must be between 1 and 2")
-            except ValueError:
-                print("This is not a number. Try again.")
-        if selection == 1:
-            conn_type = 'rdf-star'
-        else:
-            conn_type = 'reification'
+            print("Please select the connection type:")
+            print("1: RDF-star")
+            print("2: Reification")
 
-        coin_type_numbers = [100, 200, 300, 400, 500, 600, 700, 800]
-        means = []
-        data_retrieval_means = []
-        for coin_type_number in coin_type_numbers:
-            mean_time, data_retrieval_mean_time = reasoner_test_aggregation_mean(coin_type_number, 10, conn_type)
-            means.append(mean_time)
-            data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_type_number} coins.")
-            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+            selection = -1
+            while True:
+                try:
+                    selection = int(input("Select the test by typing the number: "))
+                    if 0 < selection <= 2:
+                        break
+                    else:
+                        print("Selected number must be between 1 and 2")
+                except ValueError:
+                    print("This is not a number. Try again.")
+            if selection == 1:
+                conn_type = 'rdf-star'
+            else:
+                conn_type = 'reification'
 
-        print(f"x = np.array({str(coin_type_numbers)})")
-        print(f"y = np.array({str(means)})")
-        print(f"y2 = np.array({str(data_retrieval_means)})")
-    elif selection == 4:
-        reasoner_test_aggregation_mean_handcrafted()
-    elif selection == 5:
-        # Disable logging messages for the reasoner
-        logging.getLogger('Reasoner').setLevel(logging.WARNING)
+            coin_type_numbers = [100, 200, 300, 400, 500, 600, 700, 800]
+            means = []
+            data_retrieval_means = []
+            for coin_type_number in coin_type_numbers:
+                mean_time, data_retrieval_mean_time = reasoner_test_aggregation_mean(coin_type_number, 10, conn_type)
+                means.append(mean_time)
+                data_retrieval_means.append(data_retrieval_mean_time)
+                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_type_number} coins.")
+                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
 
-        coin_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
-        means = []
-        data_retrieval_means = []
-        triple_numbers = []
-        for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time, n_triples = reasoner_test_dst_axiom_synthetic(coin_number, 1000, 10)
-            triple_numbers.append(n_triples)
-            means.append(mean_time)
-            data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
-            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(f"x = np.array({str(coin_numbers)})")
-        print(f"y = np.array({str(means)})")
-        print(f"y2 = np.array({str(data_retrieval_means)})")
-    elif selection == 6:
-        reasoner_test_DST_axiom_handcrafted()
-    elif selection == 7:
-        # Disable logging messages for the reasoner
-        logging.getLogger('Reasoner').setLevel(logging.WARNING)
+            print(f"x = np.array({str(coin_type_numbers)})")
+            print(f"y = np.array({str(means)})")
+            print(f"y2 = np.array({str(data_retrieval_means)})")
+        case 4:
+            reasoner_test_aggregation_mean_handcrafted()
+        case 5:
+            # Disable logging messages for the reasoner
+            logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-        coin_numbers = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
-        means = []
-        data_retrieval_means = []
-        for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time = reasoner_test_uncertainty_assignment_axiom_sythetic(coin_number, 100, 100, 10)
-            means.append(mean_time)
-            data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
-            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(f"x = np.array({str(coin_numbers)})")
-        print(f"y = np.array({str(means)})")
-        print(f"y2 = np.array({str(data_retrieval_means)})")
-    elif selection == 8:
-        reasoner_test_uncertainty_assignment_axiom_handcrafted()
-    elif selection == 9:
-        # Disable logging messages for the reasoner
-        logging.getLogger('Reasoner').setLevel(logging.WARNING)
+            coin_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+            means = []
+            data_retrieval_means = []
+            triple_numbers = []
+            for coin_number in coin_numbers:
+                mean_time, data_retrieval_mean_time, n_triples = reasoner_test_dst_axiom_synthetic(coin_number, 1000, 10)
+                triple_numbers.append(n_triples)
+                means.append(mean_time)
+                data_retrieval_means.append(data_retrieval_mean_time)
+                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
+                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+            print(f"x = np.array({str(coin_numbers)})")
+            print(f"y = np.array({str(means)})")
+            print(f"y2 = np.array({str(data_retrieval_means)})")
+        case 6:
+            reasoner_test_DST_axiom_handcrafted()
+        case 7:
+            # Disable logging messages for the reasoner
+            logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-        coin_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
-        means = []
-        data_retrieval_means = []
-        for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time = reasoner_test_AFE_DST_synthetic(coin_number, 100, 100, 10)
-            means.append(mean_time)
-            data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
-            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(f"x = np.array({str(coin_numbers)})")
-        print(f"y = np.array({str(means)})")
-        print(f"y2 = np.array({str(data_retrieval_means)})")
-    elif selection == 10:
-        reasoner_test_AFE_DST_handcrafted()
-    elif selection == 11:
-        reasoner_test_AFE_DST_real_data()
-    elif selection == 12:
-        # Disable logging messages for the reasoner
-        logging.getLogger('Reasoner').setLevel(logging.WARNING)
+            coin_numbers = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
+            means = []
+            data_retrieval_means = []
+            for coin_number in coin_numbers:
+                mean_time, data_retrieval_mean_time = reasoner_test_uncertainty_assignment_axiom_sythetic(coin_number, 100, 100, 10)
+                means.append(mean_time)
+                data_retrieval_means.append(data_retrieval_mean_time)
+                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
+                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+            print(f"x = np.array({str(coin_numbers)})")
+            print(f"y = np.array({str(means)})")
+            print(f"y2 = np.array({str(data_retrieval_means)})")
+        case 8:
+            reasoner_test_uncertainty_assignment_axiom_handcrafted()
+        case 9:
+            # Disable logging messages for the reasoner
+            logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-        coin_numbers = [100, 200, 300, 400, 500, 600]
-        means = []
-        data_retrieval_means = []
-        for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time = reasoner_test_chain_rule_synthetic(coin_number, 100, 10)
-            means.append(mean_time)
-            data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
-            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(f"x = np.array({str(coin_numbers)})")
-        print(f"y = np.array({str(means)})")
-        print(f"y2 = np.array({str(data_retrieval_means)})")
-    elif selection == 13:
-        # Disable logging messages for the reasoner
-        logging.getLogger('Reasoner').setLevel(logging.WARNING)
+            coin_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+            means = []
+            data_retrieval_means = []
+            for coin_number in coin_numbers:
+                mean_time, data_retrieval_mean_time = reasoner_test_AFE_DST_synthetic(coin_number, 100, 100, 10)
+                means.append(mean_time)
+                data_retrieval_means.append(data_retrieval_mean_time)
+                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
+                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+            print(f"x = np.array({str(coin_numbers)})")
+            print(f"y = np.array({str(means)})")
+            print(f"y2 = np.array({str(data_retrieval_means)})")
+        case 10:
+            reasoner_test_AFE_DST_handcrafted()
+        case 11:
+            reasoner_test_AFE_DST_real_data()
+        case 12:
+            # Disable logging messages for the reasoner
+            logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-        coin_numbers = [100, 200, 300, 400, 500, 600]
-        means = []
-        data_retrieval_means = []
-        for coin_number in coin_numbers:
-            mean_time, data_retrieval_mean_time = reasoner_test_chain_rule_part_synthetic(coin_number, 100, 10)
-            means.append(mean_time)
-            data_retrieval_means.append(data_retrieval_mean_time)
-            print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
-            print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-        print(f"x = np.array({str(coin_numbers)})")
-        print(f"y = np.array({str(means)})")
-        print(f"y2 = np.array({str(data_retrieval_means)})")
-    elif selection == 14:
-        reasoner_test_chain_rule_handcrafted()
+            coin_numbers = [100, 200, 300, 400, 500, 600]
+            means = []
+            data_retrieval_means = []
+            for coin_number in coin_numbers:
+                mean_time, data_retrieval_mean_time = reasoner_test_chain_rule_synthetic(coin_number, 100, 10)
+                means.append(mean_time)
+                data_retrieval_means.append(data_retrieval_mean_time)
+                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
+                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+            print(f"x = np.array({str(coin_numbers)})")
+            print(f"y = np.array({str(means)})")
+            print(f"y2 = np.array({str(data_retrieval_means)})")
+        case 13:
+            # Disable logging messages for the reasoner
+            logging.getLogger('Reasoner').setLevel(logging.WARNING)
+
+            coin_numbers = [100, 200, 300, 400, 500, 600]
+            means = []
+            data_retrieval_means = []
+            for coin_number in coin_numbers:
+                mean_time, data_retrieval_mean_time = reasoner_test_chain_rule_part_synthetic(coin_number, 100, 10)
+                means.append(mean_time)
+                data_retrieval_means.append(data_retrieval_mean_time)
+                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
+                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+            print(f"x = np.array({str(coin_numbers)})")
+            print(f"y = np.array({str(means)})")
+            print(f"y2 = np.array({str(data_retrieval_means)})")
+        case 14:
+            reasoner_test_chain_rule_handcrafted()
 
