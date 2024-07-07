@@ -519,16 +519,16 @@ if __name__ == '__main__':
     print("2: Test SPARQL endpoint with RDF-star triples")
     print("3: Test Use Case 1 with similarity models from multiple models (synthetic, benchmark)")
     print("4: Test Use Case 1 with similarity models from multiple models (handcrafted)")
-    print("5: Test Use Case 2 with coin types from multiple models (synthetic, benchmark)")
-    print("6: Test Use Case 2 with coin types from multiple models (handcrafted)")
-    print("7: Test Use Case 4 with certainty assignments to triple alternatives (synthetic, benchmark)")
-    print("8: Test Use Case 4 with certainty assignments to triple alternatives (handcrafted)")
-    print("9: Test Use Case 5 with AFE DST (synthetic, benchmark)")
-    print("10: Test Use Case 5 with AFE DST (handcrafted)")
-    print("11: Test Use Case 5 with AFE DST (real data)")
-    print("12: Test Use Case 6 similarity chain rules (synthetic, benchmark)")
-    print("13: Test Use Case 6 similarity chain rules while removing one chain rule (synthetic, benchmark)")
-    print("14: Test Use Case 6 similarity chain rules (handcrafted)")
+    print("5: Test Use Case 2 with certainty assignments to triple alternatives (synthetic, benchmark)")
+    print("6: Test Use Case 2 with certainty assignments to triple alternatives (handcrafted)")
+    print("7: Test Use Case 3 with coin types from multiple models (synthetic, benchmark)")
+    print("8: Test Use Case 3 with coin types from multiple models (handcrafted)")
+    print("9: Test Use Case 4 with AFE DST (synthetic, benchmark)")
+    print("10: Test Use Case 4 with AFE DST (handcrafted)")
+    print("11: Test Use Case 4 with AFE DST (real data)")
+    print("12: Test Use Case 5 similarity chain rules (synthetic, benchmark)")
+    print("13: Test Use Case 5 similarity chain rules while removing one chain rule (synthetic, benchmark)")
+    print("14: Test Use Case 5 similarity chain rules (handcrafted)")
     Path("output").mkdir(exist_ok=True)
 
     selection = -1
@@ -586,27 +586,8 @@ if __name__ == '__main__':
             print(f"y2 = np.array({str(data_retrieval_means)})")
         case 4:
             reasoner_test_aggregation_mean_handcrafted()
-        case 5:
-            # Disable logging messages for the reasoner
-            logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
-            coin_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
-            means = []
-            data_retrieval_means = []
-            triple_numbers = []
-            for coin_number in coin_numbers:
-                mean_time, data_retrieval_mean_time, n_triples = reasoner_test_dst_axiom_synthetic(coin_number, 1000, 10)
-                triple_numbers.append(n_triples)
-                means.append(mean_time)
-                data_retrieval_means.append(data_retrieval_mean_time)
-                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
-                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
-            print(f"x = np.array({str(coin_numbers)})")
-            print(f"y = np.array({str(means)})")
-            print(f"y2 = np.array({str(data_retrieval_means)})")
-        case 6:
-            reasoner_test_DST_axiom_handcrafted()
-        case 7:
+        case 5:
             # Disable logging messages for the reasoner
             logging.getLogger('Reasoner').setLevel(logging.WARNING)
 
@@ -622,8 +603,29 @@ if __name__ == '__main__':
             print(f"x = np.array({str(coin_numbers)})")
             print(f"y = np.array({str(means)})")
             print(f"y2 = np.array({str(data_retrieval_means)})")
-        case 8:
+        case 6:
             reasoner_test_uncertainty_assignment_axiom_handcrafted()
+        case 7:
+            # Disable logging messages for the reasoner
+            logging.getLogger('Reasoner').setLevel(logging.WARNING)
+
+            coin_numbers = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+            means = []
+            data_retrieval_means = []
+            triple_numbers = []
+            for coin_number in coin_numbers:
+                mean_time, data_retrieval_mean_time, n_triples = reasoner_test_dst_axiom_synthetic(coin_number, 1000,
+                                                                                                   10)
+                triple_numbers.append(n_triples)
+                means.append(mean_time)
+                data_retrieval_means.append(data_retrieval_mean_time)
+                print(f"Reasoning took an average of {round(mean_time, 3)} seconds for {coin_number} coins.")
+                print(f"{round(data_retrieval_mean_time, 3)} seconds of this was querying the data.")
+            print(f"x = np.array({str(coin_numbers)})")
+            print(f"y = np.array({str(means)})")
+            print(f"y2 = np.array({str(data_retrieval_means)})")
+        case 8:
+            reasoner_test_DST_axiom_handcrafted()
         case 9:
             # Disable logging messages for the reasoner
             logging.getLogger('Reasoner').setLevel(logging.WARNING)
