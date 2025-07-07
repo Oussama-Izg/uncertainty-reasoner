@@ -367,54 +367,70 @@ class AFEDempsterShaferAxiom(Axiom):
                 result = pd.concat([result, df_issuer_subsets])
                 continue
             issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
-            issuing_for_ignorance = self.ignorance
-            #issuing_for_ignorance = 0.05
+
+            domain_knowledge_ignorance = self.ignorance
+            #domain_knowledge_ignorance = 0.05
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
             if df_issuing_for_ignorance.shape[0] == 1:
-                issuing_for_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
-                #print(issuing_for_ignorance)
-            df_issuing_for_subsets = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
+                domain_knowledge_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
 
-            for j, issuing_for in df_issuing_for_subsets['o'].items():
+            df_issuing_for_subsets_temporary = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
+            for j, issuing_for in df_issuing_for_subsets_temporary['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
-                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, issuing_for_ignorance, self.ignorance_object))
-                #print(domain_knowledge_mass_function.get_mass_values())
+                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, domain_knowledge_ignorance, self.ignorance_object))
                 issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
-                #print("###### result #####")
-                #print(issuer_mass_function.get_mass_values())
-                #print("###### ###### #####")
 
-            self.plausibility = issuer_mass_function.get_plausibility_values()
-            self.beliefs = issuer_mass_function.get_beliefs()
+            issuing_for_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuing_for_subsets,self.ignorance, self.ignorance_object))
+            df_issuer_subsets_temporary = df_issuer_subsets[df_issuer_subsets['o'] != self.ignorance_object]
+            for i, issuer in df_issuer_subsets_temporary["o"].items():
+                df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge["o"] == issuer]
+                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, domain_knowledge_ignorance, self.ignorance_object))
+                issuing_for_mass_function = issuing_for_mass_function.join_masses(domain_knowledge_mass_function)
 
-            #print("########## plausibility ###########")
-            #print(self.plausibility)
-
-            #print("########## beliefs ###########")
-            #print(self.beliefs)
-
-            result_tmp = {
+            issuer_result_tmp = {
                 's': [],
                 'p': [],
                 'o': [],
                 'weight': []
             }
-            mass_values = issuer_mass_function.get_mass_values()
-            for issuer in mass_values:
+            issuer_mass_values = issuer_mass_function.get_mass_values()
+            for issuer in issuer_mass_values:
                 if issuer == "*":
-                    result_tmp['s'].append(coin)
-                    result_tmp['p'].append(self.issuer_predicate)
-                    result_tmp['o'].append(self.ignorance_object)
-                    result_tmp['weight'].append(mass_values[issuer])
+                    issuer_result_tmp['s'].append(coin)
+                    issuer_result_tmp['p'].append(self.issuer_predicate)
+                    issuer_result_tmp['o'].append(self.ignorance_object)
+                    issuer_result_tmp['weight'].append(issuer_mass_values[issuer])
                     continue
-                result_tmp['s'].append(coin)
-                result_tmp['p'].append(self.issuer_predicate)
-                result_tmp['o'].append(issuer)
-                result_tmp['weight'].append(mass_values[issuer])
-            result_tmp = pd.DataFrame(result_tmp)
-            result = pd.concat([result, result_tmp])
+                issuer_result_tmp['s'].append(coin)
+                issuer_result_tmp['p'].append(self.issuer_predicate)
+                issuer_result_tmp['o'].append(issuer)
+                issuer_result_tmp['weight'].append(issuer_mass_values[issuer])
+            issuer_result_tmp = pd.DataFrame(issuer_result_tmp)
+
+            issuing_for_result_tmp = {
+                's': [],
+                'p': [],
+                'o': [],
+                'weight': []
+            }
+            issuing_for_mass_values = issuing_for_mass_function.get_mass_values()
+            for issuing_for in issuing_for_mass_values:
+                if issuing_for == "*":
+                    issuing_for_result_tmp['s'].append(coin)
+                    issuing_for_result_tmp['p'].append(self.issuing_for_predicate)
+                    issuing_for_result_tmp['o'].append(self.ignorance_object)
+                    issuing_for_result_tmp['weight'].append(issuing_for_mass_values[issuing_for])
+                    continue
+                issuing_for_result_tmp['s'].append(coin)
+                issuing_for_result_tmp['p'].append(self.issuing_for_predicate)
+                issuing_for_result_tmp['o'].append(issuing_for)
+                issuing_for_result_tmp['weight'].append(issuing_for_mass_values[issuing_for])
+            issuing_for_result_tmp = pd.DataFrame(issuing_for_result_tmp)
+
+            result = pd.concat([result, issuer_result_tmp, issuing_for_result_tmp])
+
         result['weight'] = result['weight'].round(3)
-        df_triples = pd.concat([df_triples[df_triples['p'] != self.issuer_predicate], result])
+        df_triples = pd.concat([df_triples[(df_triples['p'] != self.issuer_predicate) | (df_triples['p'] != self.issuing_for_predicate)], result])
         return df_triples
 
 
