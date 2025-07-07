@@ -1,0 +1,12 @@
+s,p,o,weight,model
+ex:coin1,ex:issuing_for,ex:issuer1,1.0,
+ex:coin1,ex:issuing_for,ex:issuer2,1.0,
+ex:coin1,ex:issuing_for,ex:uncertain,1.0,
+ex:issuer1,ex:domain_knowledge,ex:issuer3,1.0,
+ex:issuer1,ex:domain_knowledge,ex:issuer5,1.0,
+ex:issuer1,ex:domain_knowledge,ex:issuer7,1.0,
+ex:issuer2,ex:domain_knowledge,ex:issuer13,1.0,
+ex:issuer2,ex:domain_knowledge,ex:issuer15,1.0,
+ex:coin1,ex:issuer,ex:issuer3,1.0,
+ex:coin1,ex:issuer,ex:issuer9,1.0,
+ex:coin1,ex:issuer,ex:uncertain,1.0,

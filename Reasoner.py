@@ -12,6 +12,9 @@ from Exceptions import ConstraintException
 
 logger = logging.getLogger(__name__)
 
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_colwidth', None)
+
 
 class Reasoner:
     """
@@ -142,7 +145,7 @@ class Reasoner:
         :param only_new: Include only the new inferred triples or triple values
         :return:
         """
-        with open(file_name, "rw") as f:
+        with open(file_name, "w") as f:
             if only_new:
                 result = self._df_triples[self._df_triples['model'] == self._reasoner_name]
             else:
@@ -239,11 +242,11 @@ class CertaintyAssignmentAxiom (Axiom):
         self.uncertainty_value = uncertainty_value
 
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
-        df_selected_triples = df_triples[df_triples['p'] == self.predicate].copy()
+        df_selected_triples = df_triples[df_triples['p'] == self.predicate].copy()  # ex:issuer', 'ex:issuing_for' or 'ex:domain_knowledge'
         df_triples = df_triples[df_triples['p'] != self.predicate]
-        df_agg = df_selected_triples[df_selected_triples['o'] != self.uncertainty_object].copy()
+        df_agg = df_selected_triples[df_selected_triples['o'] != self.uncertainty_object].copy()  # ex:uncertain excluded
         df_agg = df_agg.groupby(['s', 'p', 'model'], dropna=False)[['o']]
-        df_agg = df_agg.count()
+        df_agg = df_agg.count()  # fo reach coin how many issuers, issuing_for or domain_knowledge are given
 
         df_agg = df_agg.reset_index()
         df_agg = df_agg.rename(columns={'o': 'count'})
@@ -349,12 +352,15 @@ class AFEDempsterShaferAxiom(Axiom):
         self.ignorance_object = ignorance_object
         self.domain_knowledge_predicate = domain_knowledge_predicate
         self.issuing_for_predicate = issuing_for_predicate
+        self.plausibility = dict()
+        self.beliefs = dict()
 
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
         df_domain_knowledge = df_triples[(df_triples['p'] == self.domain_knowledge_predicate)].copy()
         df_issuer = df_triples[(df_triples['p'] == self.issuer_predicate)].copy()
         df_issuing_for = df_triples[(df_triples['p'] == self.issuing_for_predicate)].copy()
         result = pd.DataFrame()
+        #print("######## ignorance ####### " + str(self.ignorance))
         for i, coin in df_issuer['s'].drop_duplicates().items():
             df_issuer_subsets = df_issuer[df_issuer['s'] == coin]
             df_issuing_for_subsets = df_issuing_for[df_issuing_for['s'] == coin]
@@ -362,16 +368,33 @@ class AFEDempsterShaferAxiom(Axiom):
                 result = pd.concat([result, df_issuer_subsets])
                 continue
             issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
-            issuing_for_ignorance = self.ignorance
+            #print(issuer_mass_function.get_mass_values())
+            # issuing_for_ignorance = self.ignorance
+            issuing_for_ignorance = 0.05
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
             if df_issuing_for_ignorance.shape[0] == 1:
                 issuing_for_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
+                #print(issuing_for_ignorance)
             df_issuing_for_subsets = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
 
             for j, issuing_for in df_issuing_for_subsets['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
                 domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, issuing_for_ignorance, self.ignorance_object))
+                #print(domain_knowledge_mass_function.get_mass_values())
                 issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
+                #print("###### result #####")
+                #print(issuer_mass_function.get_mass_values())
+                #print("###### ###### #####")
+
+            self.plausibility = issuer_mass_function.get_plausibility_values()
+            self.beliefs = issuer_mass_function.get_beliefs()
+
+            #print("########## plausibility ###########")
+            #print(self.plausibility)
+
+            #print("########## beliefs ###########")
+            #print(self.beliefs)
+
             result_tmp = {
                 's': [],
                 'p': [],
