@@ -360,7 +360,6 @@ class AFEDempsterShaferAxiom(Axiom):
         df_issuer = df_triples[(df_triples['p'] == self.issuer_predicate)].copy()
         df_issuing_for = df_triples[(df_triples['p'] == self.issuing_for_predicate)].copy()
         result = pd.DataFrame()
-        #print("######## ignorance ####### " + str(self.ignorance))
         for i, coin in df_issuer['s'].drop_duplicates().items():
             df_issuer_subsets = df_issuer[df_issuer['s'] == coin]
             df_issuing_for_subsets = df_issuing_for[df_issuing_for['s'] == coin]
@@ -368,9 +367,8 @@ class AFEDempsterShaferAxiom(Axiom):
                 result = pd.concat([result, df_issuer_subsets])
                 continue
             issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
-            #print(issuer_mass_function.get_mass_values())
-            # issuing_for_ignorance = self.ignorance
-            issuing_for_ignorance = 0.05
+            issuing_for_ignorance = self.ignorance
+            #issuing_for_ignorance = 0.05
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
             if df_issuing_for_ignorance.shape[0] == 1:
                 issuing_for_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
