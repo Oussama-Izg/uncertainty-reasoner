@@ -210,6 +210,24 @@ def df_to_subset_dict(df: pd.DataFrame, default_ignorance: float, uncertainty_ob
     return result
 
 
+def df_to_subset_dict_s(df: pd.DataFrame, default_ignorance: float, uncertainty_object:str) -> dict[str, float]:
+    """
+    Translate dataframe to a subset dict
+    :param df: The dataframe to translate
+    :param default_ignorance: The ignorance to use
+    :param uncertainty_object: The uncertainty object that indicates ignorance
+    :return: Subset as dict
+    """
+    result = {'*': default_ignorance}
+    n = df[df['o'] != uncertainty_object].shape[0]
+    for i, x in df.iterrows():
+        if x['o'] == uncertainty_object:
+            result['*'] += x['weight']
+        else:
+            result[x['s']] = (x['weight'] - default_ignorance) / n
+    return result
+
+
 if __name__ == '__main__':
     m1 = IntervalMassFunction({'*': 0.2, (-73, -72): 0.4, (-85, -70): 0.4})
     m2 = IntervalMassFunction({'*': 0.2, (-73, -72): 0.8 / 3, (-85, -70): 0.8 / 3, (-100, -73): 0.8 / 3})

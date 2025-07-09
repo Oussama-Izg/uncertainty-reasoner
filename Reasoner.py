@@ -338,7 +338,7 @@ class AFEDempsterShaferAxiom(Axiom):
     """
     def __init__(self, issuer_predicate: str = 'ex:issuer', issuing_for_predicate: str = 'ex:issuing_for',
                  domain_knowledge_predicate: str = 'ex:domain_knowledge', ignorance_object: str = 'ex:uncertain',
-                 ignorance: float = 0.2):
+                 ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.05):
         """
         :param issuer_predicate: Issuer predicate
         :param issuing_for_predicate: Issuing for predicate
@@ -349,6 +349,7 @@ class AFEDempsterShaferAxiom(Axiom):
         super().__init__("preprocessing")
         self.issuer_predicate = issuer_predicate
         self.ignorance = ignorance
+        self.domain_knowledge_ignorance = domain_knowledge_ignorance
         self.ignorance_object = ignorance_object
         self.domain_knowledge_predicate = domain_knowledge_predicate
         self.issuing_for_predicate = issuing_for_predicate
@@ -367,26 +368,32 @@ class AFEDempsterShaferAxiom(Axiom):
                 result = pd.concat([result, df_issuer_subsets])
                 continue
             issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
+            #print(issuer_mass_function.get_mass_values())
 
-            domain_knowledge_ignorance = self.ignorance
+            #domain_knowledge_ignorance = self.ignorance
             #domain_knowledge_ignorance = 0.05
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
             if df_issuing_for_ignorance.shape[0] == 1:
-                domain_knowledge_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
+                self.domain_knowledge_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
 
             df_issuing_for_subsets_temporary = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
             for j, issuing_for in df_issuing_for_subsets_temporary['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
-                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, domain_knowledge_ignorance, self.ignorance_object))
+                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, self.domain_knowledge_ignorance, self.ignorance_object))
+                #print(domain_knowledge_mass_function.get_mass_values())
                 issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
 
-            issuing_for_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuing_for_subsets,self.ignorance, self.ignorance_object))
+            issuing_for_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuing_for_subsets, self.ignorance, self.ignorance_object))
+            #print(issuing_for_mass_function.get_mass_values())
             df_issuer_subsets_temporary = df_issuer_subsets[df_issuer_subsets['o'] != self.ignorance_object]
             for i, issuer in df_issuer_subsets_temporary["o"].items():
-                df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge["o"] == issuer]
-                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, domain_knowledge_ignorance, self.ignorance_object))
+                df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge["s"] == issuer]
+                domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, self.domain_knowledge_ignorance, self.ignorance_object))
+                #print(df_domain_knowledge_subsets)
+                #print(domain_knowledge_mass_function.get_mass_values())
                 issuing_for_mass_function = issuing_for_mass_function.join_masses(domain_knowledge_mass_function)
-
+            #print("issuing for")
+            #print(issuing_for_mass_function.get_mass_values())
             issuer_result_tmp = {
                 's': [],
                 'p': [],
@@ -430,7 +437,13 @@ class AFEDempsterShaferAxiom(Axiom):
             result = pd.concat([result, issuer_result_tmp, issuing_for_result_tmp])
 
         result['weight'] = result['weight'].round(3)
-        df_triples = pd.concat([df_triples[(df_triples['p'] != self.issuer_predicate) | (df_triples['p'] != self.issuing_for_predicate)], result])
+
+        df_triples = df_triples[df_triples['p'] != self.issuer_predicate]
+        df_triples = df_triples[df_triples['p'] != self.issuing_for_predicate]
+        df_triples = pd.concat([df_triples, result])
+
+        print(df_triples)
+        print("##################################################")
         return df_triples
 
 
@@ -480,6 +493,32 @@ class InverseAxiom(Axiom):
         df_tmp['p'] = self.inverse
         df_triples = pd.concat([df_triples, df_tmp]).sort_values(by='weight', ascending=True)
         df_triples = df_triples.drop_duplicates(subset=['s', 'p', 'o'], keep='last')
+
+        return df_triples
+
+
+class EquivalenceAxiom(Axiom):
+    """
+    Defines the equivalence of predicates. The inverse of an antecedent has the same weight as the antecedent.
+    """
+    def __init__(self, equivalence_predicate: str):
+        """
+        :param equivalence_predicate: equivalence predicate
+        """
+        super().__init__('preprocessing')
+        self.equivalence_predicate = equivalence_predicate
+
+
+    def reason(self, df_triples: pd.DataFrame,
+               df_classes: pd.DataFrame) -> pd.DataFrame:
+        df_tmp = df_triples[df_triples['p'] == self.equivalence_predicate].copy()
+        df_tmp = df_tmp.rename(columns={'s': 's_t'})
+        df_tmp = df_tmp.rename(columns={'s_t': 'o', 'o': 's'})
+        df_tmp['p'] = self.equivalence_predicate
+        df_triples = pd.concat([df_triples, df_tmp]).sort_values(by='weight',
+                                                                 ascending=True)
+        df_triples = df_triples.drop_duplicates(subset=['s', 'p', 'o'],
+                                                keep='last')
 
         return df_triples
 
