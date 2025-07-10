@@ -24,7 +24,7 @@ def run_use_cases():
         Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge",
                                           uncertainty_value=0.0),
         Reasoner.AFEDempsterShaferAxiom("ex:issuer", "ex:issuing_for",
-                                        "ex:domain_knowledge")
+                                              "ex:domain_knowledge")
     ]
 
     axioms2 = [
@@ -40,7 +40,7 @@ def run_use_cases():
         if os.path.isdir(folder_path):
             # Loop through all CSV files in the folder
             for filename in os.listdir(folder_path):
-                if filename.endswith(".csv"):
+                if filename.endswith(".csv") and "usecase_10.csv" in filename and "result" not in filename:
                     # if filename.endswith(".csv") and "result" not in filename:
                     csv_path = os.path.join(folder_path, filename)
                     df = pd.read_csv(csv_path)
