@@ -75,5 +75,5 @@ def delete_results():
 
 
 if __name__ == "__main__":
-    run_use_cases()
-    #delete_results()
+    #run_use_cases()
+    delete_results()
