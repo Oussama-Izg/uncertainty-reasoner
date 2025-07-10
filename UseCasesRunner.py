@@ -40,7 +40,7 @@ def run_use_cases():
         if os.path.isdir(folder_path):
             # Loop through all CSV files in the folder
             for filename in os.listdir(folder_path):
-                if filename.endswith(".csv") and "usecase_10.csv" in filename and "result" not in filename:
+                if filename.endswith(".csv"):
                     # if filename.endswith(".csv") and "result" not in filename:
                     csv_path = os.path.join(folder_path, filename)
                     df = pd.read_csv(csv_path)
@@ -79,5 +79,5 @@ def delete_results():
 
 
 if __name__ == "__main__":
-    run_use_cases()
-    #delete_results()
+    #run_use_cases()
+    delete_results()
