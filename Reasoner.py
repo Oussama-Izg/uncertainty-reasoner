@@ -251,6 +251,10 @@ class CertaintyAssignmentAxiom (Axiom):
         df_agg = df_agg.reset_index()
         df_agg = df_agg.rename(columns={'o': 'count'})
 
+        df_selected_triples['model'] = df_selected_triples['model'].astype(str)
+        df_agg['model'] = df_agg['model'].astype(str)
+
+
         df_selected_triples = pd.merge(df_selected_triples, df_agg, on=['s', 'p', 'model'])
         df_selected_triples = pd.merge(df_selected_triples, df_selected_triples[df_selected_triples['o'] == self.uncertainty_object][['s', 'p', 'model']],
                                        on=['s', 'p', 'model'], how='left', indicator=True)
@@ -355,8 +359,13 @@ class AFEDempsterShaferAxiom(Axiom):
             domain_knowledge_predicate, ignorance_object, ignorance)
 
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
-        issuing_for_results = self.dempster_shafer_axiom_issuing_For.reason(df_triples, df_classes)
-        issuer_results = self.dempster_shafer_axiom_issuer.reason(df_triples, df_classes)
+        df_triples_copy_1 = df_triples.copy(deep=True)
+        df_triples_copy_2 = df_triples.copy(deep=True)
+        df_classes_copy_1 = df_classes.copy(deep=True)
+        df_classes_copy_2 = df_classes.copy(deep=True)
+        #print(df_triples_copy_1)
+        issuing_for_results = self.dempster_shafer_axiom_issuing_For.reason(df_triples_copy_1, df_classes_copy_1)
+        issuer_results = self.dempster_shafer_axiom_issuer.reason(df_triples_copy_2, df_classes_copy_2)
         df_triples = pd.concat([issuing_for_results, issuer_results])
         df_triples = df_triples.drop_duplicates()
 
