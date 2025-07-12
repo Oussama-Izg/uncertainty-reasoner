@@ -18,12 +18,13 @@ def run_use_cases():
                                                       GSP_ENDPOINT)
 
     axioms = [
-        Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
-        Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
-        Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge",
-                                          uncertainty_value=0.0),
-        Reasoner.AFEDempsterShaferAxiom("ex:issuer", "ex:issuing_for",
-                                        "ex:domain_knowledge")
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
+        Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
+        Reasoner.CertaintyAssignmentAxiom("ex:inPossibleIssuersOf"),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasIssuer",
+                                          knowledge_path_predicate="nmo:hasPortrait",
+                                          domain_knowledge_predicate="ex:hasPossibleIssuers")
     ]
 
     # Path to the root directory containing all test case folders
@@ -54,9 +55,6 @@ def run_use_cases():
                     result_path = os.path.join(folder_path, results_file_name)
                     results_df.to_csv(result_path, index=False)
 
-                    reasoner.save_data_to_file(
-                        file_name="result_usecase_1.ttl", conn=conn)
-
                     print(
                         f"Reasoning Results from Reasoner1 are stored in {result_path}")
 
@@ -75,5 +73,5 @@ def delete_results():
 
 
 if __name__ == "__main__":
-    #run_use_cases()
-    delete_results()
+    run_use_cases()
+    #delete_results()
