@@ -9,15 +9,26 @@ def create_domain_knowledge_triples(filepath: str, target_path: str):
 
     df_domain_knowledge = df_domain_knowledge[['coinimage', 'issuer']]
 
-    df_domain_knowledge["coinimage"] = "ex:issuing_for_" + df_domain_knowledge[
+    df_domain_knowledge["coinimage"] = "ex:person_" + df_domain_knowledge[
         "coinimage"].astype(str)
     df_domain_knowledge["issuer"] = "ex:issuer_" + df_domain_knowledge[
         "issuer"].astype(str)
+
+    df_domain_knowledge_reverse = df_domain_knowledge.copy()
+
     df_domain_knowledge = df_domain_knowledge.rename(columns={
         'coinimage': 's',
         'issuer': 'o'
     })
-    df_domain_knowledge['p'] = 'ex:domain_knowledge'
+    df_domain_knowledge['p'] = 'ex:hasPossibleIssuers'
+
+    df_domain_knowledge_reverse = df_domain_knowledge_reverse.rename(columns={
+        "coinimage": "o",
+        "issuer": "s"
+    })
+    df_domain_knowledge_reverse["p"] = "ex:inPossibleIssuersOf"
+
+    df_domain_knowledge = pd.concat([df_domain_knowledge, df_domain_knowledge_reverse])
 
     df_domain_knowledge.to_csv(target_path, index=False)
 
@@ -49,7 +60,7 @@ def create_issuer_triples(filepath: str, target_path: str):
 
     df_issuer['s'] = 'ex:coin_' + df_issuer['s'].astype(str)
     df_issuer['o'] = 'ex:issuer_' + df_issuer['o'].astype(str)
-    df_issuer['p'] = 'ex:issuer'
+    df_issuer['p'] = 'nmo:hasIssuer'
 
     df_issuer.to_csv(target_path, index=False)
 
@@ -78,9 +89,9 @@ def create_issuing_for_triples(filepath: str, target_path: str):
                 )
     )
 
-    df_issuing_for_1['o'] = 'ex:issuing_for_' + df_issuing_for_1['o'].astype(
+    df_issuing_for_1['o'] = 'ex:person_' + df_issuing_for_1['o'].astype(
         int).astype(str)
-    df_issuing_for_2['o'] = 'ex:issuing_for_' + df_issuing_for_2['o'].astype(
+    df_issuing_for_2['o'] = 'ex:person_' + df_issuing_for_2['o'].astype(
         int).astype(str)
 
     df_issuing_for_uncertain = \
@@ -94,7 +105,7 @@ def create_issuing_for_triples(filepath: str, target_path: str):
         [df_issuing_for_1, df_issuing_for_2, df_issuing_for_uncertain])
 
     df_issuing_for['s'] = 'ex:coin_' + df_issuing_for['s'].astype(str)
-    df_issuing_for['p'] = "ex:issuing_for"
+    df_issuing_for['p'] = "nmo:hasPortrait"
 
     df_issuing_for.to_csv(target_path, index=False)
 
