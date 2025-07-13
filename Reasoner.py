@@ -91,12 +91,51 @@ class Reasoner:
         logger.info(f"Starting reasoning.")
         start_reasoning = time.time()
         df_before = self._df_triples.copy()
+
         if len(self._preprocessing_axioms) != 0:
-            logger.info(f"Starting preprocessing.")
+            logger.info("Starting preprocessing.")
             start_postprocessing = time.time()
-            for axiom in self._preprocessing_axioms:
-                self._df_triples = axiom.reason(self._df_triples, self._df_classes).reset_index(drop=True)
-                self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
+
+            i = 0
+            while i < len(self._preprocessing_axioms):
+                axiom = self._preprocessing_axioms[i]
+
+                # Case: Two consecutive DempsterShaferAxiom_2 → apply them in parallel
+                if (
+                        isinstance(axiom, AFEDempsterShaferAxiom_2)
+                        and i + 1 < len(self._preprocessing_axioms)
+                        and isinstance(self._preprocessing_axioms[i + 1],
+                                       AFEDempsterShaferAxiom_2)
+                ):
+                    axiom_1 = axiom
+                    axiom_2 = self._preprocessing_axioms[i + 1]
+
+                    # Make deep copies of the original DataFrames
+                    df_triples_copy_1 = self._df_triples.copy(deep=True)
+                    df_triples_copy_2 = self._df_triples.copy(deep=True)
+                    df_classes_copy_1 = self._df_classes.copy(deep=True)
+                    df_classes_copy_2 = self._df_classes.copy(deep=True)
+
+                    # Apply both axioms separately
+                    df_triples_1 = axiom_1.reason(df_triples_copy_1, df_classes_copy_1).reset_index(drop=True)
+                    df_triples_1 = df_triples_1[df_triples_1['p'] != axiom_1.knowledge_path_predicate]
+
+                    df_triples_2 = axiom_2.reason(df_triples_copy_2, df_classes_copy_2).reset_index(drop=True)
+                    df_triples_2 = df_triples_2[df_triples_2['p'] != axiom_2.knowledge_path_predicate]
+
+                    # Combine the results and deduplicate
+                    self._df_triples = pd.concat([df_triples_1, df_triples_2], ignore_index=True)
+                    self._df_triples = self._df_triples.drop_duplicates()
+                    self._df_triples = self._df_triples[
+                        ['s', 'p', 'o', 'weight', 'model']]
+
+                    i += 2  # Skip the next axiom since it's already processed
+                else:
+                    # Default case: apply axiom normally
+                    self._df_triples = axiom.reason(self._df_triples, self._df_classes).reset_index(drop=True)
+                    self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
+                    i += 1
+
             end_postprocessing = time.time()
 
             logger.info(f"Preprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
@@ -368,7 +407,6 @@ class AFEDempsterShaferAxiom(Axiom):
                 continue
             issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
             issuing_for_ignorance = self.ignorance
-            #issuing_for_ignorance = 0.05
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
             if df_issuing_for_ignorance.shape[0] == 1:
                 issuing_for_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
@@ -446,15 +484,17 @@ class AFEDempsterShaferAxiom_2(Axiom):
 
             target_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_target_subsets, self.ignorance, self.ignorance_object))
 
+            knowledge_ignorance = self.domain_knowledge_ignorance
             df_knowledge_path_ignorance = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] == self.ignorance_object]
             if df_knowledge_path_ignorance.shape[0] == 1:
-                self.domain_knowledge_ignorance += df_knowledge_path_ignorance['weight'].iloc[0]
+
+                knowledge_ignorance += df_knowledge_path_ignorance['weight'].iloc[0]
 
             df_knowledge_path_subsets = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] != self.ignorance_object]
             for j, knowledge_path in df_knowledge_path_subsets['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == knowledge_path]
                 if not df_domain_knowledge_subsets.empty:
-                    domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, self.domain_knowledge_ignorance, self.ignorance_object))
+                    domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, knowledge_ignorance, self.ignorance_object))
                     target_mass_function = target_mass_function.join_masses(domain_knowledge_mass_function)
 
             result_tmp = {

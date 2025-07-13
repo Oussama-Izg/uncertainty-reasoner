@@ -13,9 +13,12 @@ def run_use_cases():
     # Graph Store Protocol endpoint
     GSP_ENDPOINT = "http://localhost:3030/test/data"
 
+    prefixes = {"nmo": "http://nomisma.org/ontology#"}
+
     conn = SparqlConnector.ReificationSparqlConnector(QUERY_ENDPOINT,
                                                       UPDATE_ENDPOINT,
-                                                      GSP_ENDPOINT)
+                                                      GSP_ENDPOINT,
+                                                      prefixes=prefixes)
 
     axioms = [
         Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
@@ -24,7 +27,8 @@ def run_use_cases():
         Reasoner.CertaintyAssignmentAxiom("ex:inPossibleIssuersOf"),
         Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasIssuer",
                                           knowledge_path_predicate="nmo:hasPortrait",
-                                          domain_knowledge_predicate="ex:hasPossibleIssuers")
+                                          domain_knowledge_predicate="ex:hasPossibleIssuers"),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasPortrait",knowledge_path_predicate="nmo:hasIssuer",domain_knowledge_predicate="ex:inPossibleIssuersOf")
     ]
 
     # Path to the root directory containing all test case folders
@@ -73,5 +77,5 @@ def delete_results():
 
 
 if __name__ == "__main__":
-    run_use_cases()
-    #delete_results()
+    delete_results()
+    #run_use_cases()
