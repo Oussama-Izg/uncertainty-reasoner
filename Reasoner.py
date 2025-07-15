@@ -446,8 +446,8 @@ class AFEDempsterShaferAxiom_2(Axiom):
     """
     Use-case-specific Dempster-Shafer axiom for AFE data
     """
-    def __init__(self, target_predicate: str = 'ex:issuer', knowledge_path_predicate: str = 'ex:issuing_for',
-                 domain_knowledge_predicate: str = 'ex:domain_knowledge', ignorance_object: str = 'ex:uncertain',
+    def __init__(self, target_predicate: str = 'nmo:hasIssuer', knowledge_path_predicate: str = 'nmo:hasPortait',
+                 domain_knowledge_predicate: str = 'ex:hasPossibleIssuers', ignorance_object: str = 'ex:uncertain',
                  ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.05):
         """
         :param target_predicate: Issuer predicate

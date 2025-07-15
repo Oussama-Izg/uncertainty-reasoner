@@ -78,4 +78,4 @@ def delete_results():
 
 if __name__ == "__main__":
     delete_results()
-    #run_use_cases()
+    run_use_cases()
