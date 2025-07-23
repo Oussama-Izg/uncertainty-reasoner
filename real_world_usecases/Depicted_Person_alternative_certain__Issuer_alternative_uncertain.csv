@@ -1,0 +1,14 @@
+s,p,o
+ex:coin_15098,nmo:hasIssuer,ex:issuer_154
+ex:coin_15098,nmo:hasIssuer,ex:issuer_151
+ex:coin_15098,nmo:hasIssuer,ex:uncertain
+ex:coin_15098,nmo:hasPortrait,ex:person_120
+ex:coin_15098,nmo:hasPortrait,ex:person_70
+ex:person_120,ex:hasPossibleIssuers,ex:issuer_151
+ex:person_70,ex:hasPossibleIssuers,ex:issuer_59
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_34
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_39
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_40
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_41
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_43
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_120

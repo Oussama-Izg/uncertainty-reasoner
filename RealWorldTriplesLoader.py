@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
 
@@ -38,6 +39,7 @@ def create_domain_knowledge_triples(filepath: str, target_path: str):
 def create_issuer_triples(filepath: str, target_path: str):
     df = pd.read_excel(filepath)
     df = df.drop_duplicates()
+    df = df[df["CoinImage_Uncertainty_mapped"].notna()]
     df = df[['id', 'issuers_ids', 'issuer_uncertainty']]
 
     # Split 'issuers_ids' by comma into lists
@@ -48,9 +50,7 @@ def create_issuer_triples(filepath: str, target_path: str):
     df_issuer = df[['id', 'issuers_ids', 'issuer_uncertainty']]
 
     # Identify issuer selections that are uncertain
-    df_issuer_uncertain = \
-    df_issuer[df_issuer['issuer_uncertainty'].isin([2, 4])][
-        ['id']].drop_duplicates()
+    df_issuer_uncertain = df_issuer[df_issuer['issuer_uncertainty'].isin([2, 4])][['id']].drop_duplicates()
     df_issuer_uncertain = df_issuer_uncertain.rename(columns={'id': 's'})
     df_issuer_uncertain['o'] = 'ex:uncertain'
 
@@ -59,7 +59,11 @@ def create_issuer_triples(filepath: str, target_path: str):
         [df_issuer.drop(columns=['issuer_uncertainty']), df_issuer_uncertain])
 
     df_issuer['s'] = 'ex:coin_' + df_issuer['s'].astype(str)
-    df_issuer['o'] = 'ex:issuer_' + df_issuer['o'].astype(str)
+    df_issuer['o'] = np.where(
+        df_issuer['o'].str.contains("ex:uncertain", na=False),
+        df_issuer['o'],  # leave as-is if it contains "ex:uncertain"
+        'ex:issuer_' + df_issuer['o'].astype(str)  # otherwise, prefix
+    )
     df_issuer['p'] = 'nmo:hasIssuer'
 
     df_issuer.to_csv(target_path, index=False)
@@ -129,4 +133,4 @@ if __name__ == "__main__":
     df_issuing_for = create_issuing_for_triples(filepath="data/2025_06_26_Issuer_IssuingFor.xlsx",
                                     target_path="triples/issuing_for_triples.csv")
 
-    all_triples = create_all_triples(df_domain_knowledge, df_issuer, df_issuing_for, target_path="triples/all_triples")
+    all_triples = create_all_triples(df_domain_knowledge, df_issuer, df_issuing_for, target_path="triples/all_triples.csv")
