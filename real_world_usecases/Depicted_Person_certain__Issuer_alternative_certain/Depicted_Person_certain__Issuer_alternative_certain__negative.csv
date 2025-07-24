@@ -1,0 +1,5 @@
+s,p,o
+ex:coin_11454,nmo:hasIssuer,ex:issuer_114
+ex:coin_11454,nmo:hasIssuer,ex:issuer_116
+ex:coin_11454,nmo:hasPortrait,ex:person_57
+ex:person_57,ex:hasPossibleIssuers,ex:issuer_113

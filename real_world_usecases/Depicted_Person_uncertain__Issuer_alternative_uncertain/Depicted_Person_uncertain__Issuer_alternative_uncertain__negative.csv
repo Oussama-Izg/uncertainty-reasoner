@@ -1,0 +1,15 @@
+s,p,o
+ex:coin_29041,nmo:hasIssuer,ex:issuer_131
+ex:coin_29041,nmo:hasIssuer,ex:issuer_154
+ex:coin_29041,nmo:hasIssuer,ex:uncertain
+ex:coin_29041,nmo:hasPortrait,ex:person_41
+ex:coin_29041,nmo:hasPortrait,ex:uncertain
+ex:person_41,ex:hasPossibleIssuers,ex:issuer_151
+ex:person_41,ex:hasPossibleIssuers,ex:issuer_152
+ex:issuer_131,ex:inPossibleIssuersOf,ex:person_31
+ex:issuer_131,ex:inPossibleIssuersOf,ex:person_42
+ex:coin_30082,nmo:hasIssuer,ex:issuer_131
+ex:coin_30082,nmo:hasIssuer,ex:issuer_154
+ex:coin_30082,nmo:hasIssuer,ex:uncertain
+ex:coin_30082,nmo:hasPortrait,ex:person_41
+ex:coin_30082,nmo:hasPortrait,ex:uncertain

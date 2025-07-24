@@ -12,3 +12,13 @@ ex:issuer_151,ex:inPossibleIssuersOf,ex:person_40
 ex:issuer_151,ex:inPossibleIssuersOf,ex:person_41
 ex:issuer_151,ex:inPossibleIssuersOf,ex:person_43
 ex:issuer_151,ex:inPossibleIssuersOf,ex:person_120
+ex:person_34,ex:hasPossibleIssuers,ex:issuer_151
+ex:person_34,ex:hasPossibleIssuers,ex:issuer_161
+ex:person_39,ex:hasPossibleIssuers,ex:issuer_151
+ex:person_39,ex:hasPossibleIssuers,ex:issuer_152
+ex:person_40,ex:hasPossibleIssuers,ex:issuer_151
+ex:person_40,ex:hasPossibleIssuers,ex:issuer_152
+ex:person_41,ex:hasPossibleIssuers,ex:issuer_151
+ex:person_41,ex:hasPossibleIssuers,ex:issuer_152
+ex:person_43,ex:hasPossibleIssuers,ex:issuer_151
+ex:person_43,ex:hasPossibleIssuers,ex:issuer_152
