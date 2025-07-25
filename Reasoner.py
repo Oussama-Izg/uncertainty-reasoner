@@ -170,7 +170,7 @@ class Axiom(ABC):
     """
     Abstract Axiom class to implement reasoning axioms
     """
-    def __init__(self, stage: Literal['preprocessing', 'rule_based_reasoning', 'postprocessing']):
+    def __init__(self, stage: Literal['preprocessing', 'rule_based_reasoning', 'postprocessing'], group):
         """
         :param stage: Defines the reasoning stage: preprocessing, rule_based_reasoning or postprocessing
         """
@@ -197,12 +197,12 @@ class AggregationAxiom(Axiom):
     """
     Axiom to aggregate weights by model using simple aggregation functions
     """
-    def __init__(self, predicate: str, aggregation_type: Literal["mean", "median"]):
+    def __init__(self, predicate: str, aggregation_type: Literal["mean", "median"], group: str = "Undefined"):
         """
         :param predicate: Predicate to aggregate
         :param aggregation_type: Aggregation type
         """
-        super().__init__("preprocessing")
+        super().__init__("preprocessing", group)
         self.predicate = predicate
 
         if aggregation_type not in ['mean', 'median']:
@@ -230,13 +230,13 @@ class CertaintyAssignmentAxiom (Axiom):
     """
     Uses a heuristic to assign certainty weights to triples.
     """
-    def __init__(self, predicate: str, uncertainty_object: str = "ex:uncertain", uncertainty_value: float = 0.2):
+    def __init__(self, predicate: str, uncertainty_object: str = "ex:uncertain", uncertainty_value: float = 0.2, group: str = "Undefined"):
         """
         :param predicate: The predicate to use
         :param uncertainty_object: Object indicating uncertainty about the selection
         :param uncertainty_value: Certainty value for the uncertainty object
         """
-        super().__init__("preprocessing")
+        super().__init__("preprocessing", group)
         self.predicate = predicate
         self.uncertainty_object = uncertainty_object
         self.uncertainty_value = uncertainty_value
@@ -270,13 +270,13 @@ class DempsterShaferAxiom(Axiom):
     only be used for certainty weights.
     """
     def __init__(self, predicate: str, ignorance_object: str = 'ex:uncertain', ignorance: dict[str, float] = None,
-                 default_ignorance: float = 0.2):
+                 default_ignorance: float = 0.2, group: str = "Undefined"):
         """
         :param predicate: Predicate to aggregate
         :param ignorance_object: Object that increases ignorance for the mass function
         :param default_ignorance: Default ignorance
         """
-        super().__init__("preprocessing")
+        super().__init__("preprocessing", group)
         if ignorance is None:
             ignorance = {}
         self.predicate = predicate
@@ -338,7 +338,7 @@ class AFEDempsterShaferAxiom(Axiom):
     """
     def __init__(self, issuer_predicate: str = 'ex:issuer', issuing_for_predicate: str = 'ex:issuing_for',
                  domain_knowledge_predicate: str = 'ex:domain_knowledge', ignorance_object: str = 'ex:uncertain',
-                 ignorance: float = 0.2):
+                 ignorance: float = 0.2, group: str = "Undefined"):
         """
         :param issuer_predicate: Issuer predicate
         :param issuing_for_predicate: Issuing for predicate
@@ -346,7 +346,7 @@ class AFEDempsterShaferAxiom(Axiom):
         :param ignorance_object: Object that increases ignorance for the mass function
         :param ignorance: Default ignorance
         """
-        super().__init__("preprocessing")
+        super().__init__("preprocessing", group)
         self.issuer_predicate = issuer_predicate
         self.ignorance = ignorance
         self.ignorance_object = ignorance_object
@@ -422,11 +422,11 @@ class NormalizationAxiom(Axiom):
     """
     Normalizes the weights by model to sum up to one
     """
-    def __init__(self, predicate: str):
+    def __init__(self, predicate: str, group: str = "Undefined"):
         """
         :param predicate: Predicate to normalize
         """
-        super().__init__("postprocessing")
+        super().__init__("postprocessing", group)
         self.predicate = predicate
 
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
@@ -448,12 +448,12 @@ class InverseAxiom(Axiom):
     """
     Defines the inverse of predicates. The inverse of an antecedent has the same weight as the antecedent.
     """
-    def __init__(self, antecedent: str, inverse: str):
+    def __init__(self, antecedent: str, inverse: str, group: str = "Undefined"):
         """
         :param antecedent: Antecedent predicate
         :param inverse: Inverse predicate
         """
-        super().__init__('rule_based_reasoning')
+        super().__init__('rule_based_reasoning', group)
         self.antecedent = antecedent
         self.inverse = inverse
 
@@ -473,7 +473,7 @@ class ChainRuleAxiom(Axiom):
     Implements a modified version of the chain rule axiom from the Academic Meta Tool.
     """
     def __init__(self, antecedent1: str, antecedent2: str, consequent: str, reasoning_logic: Literal['product', 'goedel', 'lukasiewicz'], sum_values: bool = False, class_1: str = None, class_2: str = None,
-                 class_3: str = None, input_threshold: float = None, output_threshold: float = None):
+                 class_3: str = None, input_threshold: float = None, output_threshold: float = None, group: str = "Undefined"):
         """
 
         :param antecedent1: First antecedent predicate: A antecedent1 B
@@ -487,7 +487,7 @@ class ChainRuleAxiom(Axiom):
         :param input_threshold: Optional input threshold for weights
         :param output_threshold: Optional output threshold for weights
         """
-        super().__init__('rule_based_reasoning')
+        super().__init__('rule_based_reasoning', group)
         self.antecedent1 = antecedent1
         self.antecedent2 = antecedent2
         self.consequent = consequent
@@ -575,14 +575,14 @@ class DisjointAxiom(Axiom):
     """
     Axiom to add a constraint that disallows two predicate to have the same subject and object.
     """
-    def __init__(self, predicate1: str, predicate2: str, throw_exception: bool = True, keep_predicate1: bool = True):
+    def __init__(self, predicate1: str, predicate2: str, throw_exception: bool = True, keep_predicate1: bool = True, group: str = "Undefined"):
         """
         :param predicate1: First predicate
         :param predicate2: Second predicate
         :param throw_exception: Throw exception or just remove one of the triples?
         :param keep_predicate1: Keep predicate1 or predicate2?
         """
-        super().__init__("rule_based_reasoning")
+        super().__init__("rule_based_reasoning", group)
         self.predicate1 = predicate1
         self.predicate2 = predicate2
         self.throw_exception = throw_exception
@@ -618,13 +618,13 @@ class SelfDisjointAxiom(Axiom):
     """
     Constraint axiom to disallow self-referencing for a given predicate
     """
-    def __init__(self, predicate: str, throw_exception: bool = True):
+    def __init__(self, predicate: str, throw_exception: bool = True, group: str = "Undefined"):
         """
 
         :param predicate: Predicate to disallow self-referencing for
         :param throw_exception: Throw exception or just remove the triples?
         """
-        super().__init__("rule_based_reasoning")
+        super().__init__("rule_based_reasoning", group)
         self.predicate = predicate
         self.throw_exception = throw_exception
 
