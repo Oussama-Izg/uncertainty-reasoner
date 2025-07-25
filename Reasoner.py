@@ -126,7 +126,9 @@ class Reasoner:
                     # Apply all group axioms on the same base data
                     results = []
                     for ax, df_t, df_c in zip(group_axioms, df_triples_copies, df_classes_copies):
-                        df_result = ax.reason(df_t, df_c).reset_index( drop=True)
+                        df_result = ax.reason(df_t, df_c).reset_index(drop=True)
+
+                        #print(ax.target_predicate)
 
                         if hasattr(ax, 'knowledge_path_predicate'):
                             df_result = df_result[df_result['p'] != ax.knowledge_path_predicate]

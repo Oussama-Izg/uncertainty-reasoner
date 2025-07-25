@@ -13,17 +13,24 @@ def run_use_cases():
     # Graph Store Protocol endpoint
     GSP_ENDPOINT = "http://localhost:3030/test/data"
 
+    prefixes = {"nmo": "http://nomisma.org/ontology#"}
+
     conn = SparqlConnector.ReificationSparqlConnector(QUERY_ENDPOINT,
                                                       UPDATE_ENDPOINT,
-                                                      GSP_ENDPOINT)
+                                                      GSP_ENDPOINT,
+                                                      prefixes=prefixes)
 
     axioms = [
-        Reasoner.CertaintyAssignmentAxiom("ex:issuer"),
-        Reasoner.CertaintyAssignmentAxiom("ex:issuing_for"),
-        Reasoner.CertaintyAssignmentAxiom("ex:domain_knowledge",
-                                          uncertainty_value=0.0),
-        Reasoner.AFEDempsterShaferAxiom("ex:issuer", "ex:issuing_for",
-                                        "ex:domain_knowledge")
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
+        Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
+        Reasoner.CertaintyAssignmentAxiom("ex:inPossibleIssuersOf"),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasPortrait",
+                                          knowledge_path_predicate="nmo:hasIssuer",
+                                          domain_knowledge_predicate="ex:inPossibleIssuersOf"),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasIssuer",
+                                          knowledge_path_predicate="nmo:hasPortrait",
+                                          domain_knowledge_predicate="ex:hasPossibleIssuers")
     ]
 
     # Path to the root directory containing all test case folders
@@ -35,7 +42,7 @@ def run_use_cases():
         if os.path.isdir(folder_path):
             # Loop through all CSV files in the folder
             for filename in os.listdir(folder_path):
-                if filename.endswith(".csv"):
+                if filename.endswith(".csv") and ("usecase_9" in filename or "usecase_10" in filename):
                     # if filename.endswith(".csv") and "result" not in filename:
                     csv_path = os.path.join(folder_path, filename)
                     df = pd.read_csv(csv_path)
@@ -53,9 +60,6 @@ def run_use_cases():
                     results_file_name = f"result_{filename}"
                     result_path = os.path.join(folder_path, results_file_name)
                     results_df.to_csv(result_path, index=False)
-
-                    reasoner.save_data_to_file(
-                        file_name="result_usecase_1.ttl", conn=conn)
 
                     print(
                         f"Reasoning Results from Reasoner1 are stored in {result_path}")
@@ -75,5 +79,5 @@ def delete_results():
 
 
 if __name__ == "__main__":
-    #run_use_cases()
     delete_results()
+    run_use_cases()
