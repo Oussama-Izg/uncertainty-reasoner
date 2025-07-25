@@ -368,30 +368,18 @@ class AFEDempsterShaferAxiom(Axiom):
                 continue
             issuer_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_issuer_subsets, self.ignorance, self.ignorance_object))
             issuing_for_ignorance = self.ignorance
-            #issuing_for_ignorance = 0.05
             df_issuing_for_ignorance = df_issuing_for_subsets[df_issuing_for_subsets['o'] == self.ignorance_object]
             if df_issuing_for_ignorance.shape[0] == 1:
                 issuing_for_ignorance += df_issuing_for_ignorance['weight'].iloc[0]
-                #print(issuing_for_ignorance)
             df_issuing_for_subsets = df_issuing_for_subsets[df_issuing_for_subsets['o'] != self.ignorance_object]
 
             for j, issuing_for in df_issuing_for_subsets['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == issuing_for]
                 domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, issuing_for_ignorance, self.ignorance_object))
-                #print(domain_knowledge_mass_function.get_mass_values())
                 issuer_mass_function = issuer_mass_function.join_masses(domain_knowledge_mass_function)
-                #print("###### result #####")
-                #print(issuer_mass_function.get_mass_values())
-                #print("###### ###### #####")
 
             self.plausibility = issuer_mass_function.get_plausibility_values()
             self.beliefs = issuer_mass_function.get_beliefs()
-
-            #print("########## plausibility ###########")
-            #print(self.plausibility)
-
-            #print("########## beliefs ###########")
-            #print(self.beliefs)
 
             result_tmp = {
                 's': [],
@@ -415,6 +403,88 @@ class AFEDempsterShaferAxiom(Axiom):
             result = pd.concat([result, result_tmp])
         result['weight'] = result['weight'].round(3)
         df_triples = pd.concat([df_triples[df_triples['p'] != self.issuer_predicate], result])
+        return df_triples
+
+
+class AFEDempsterShaferAxiom_2(Axiom):
+    """
+    Use-case-specific Dempster-Shafer axiom for AFE data
+    """
+    def __init__(self, target_predicate: str = 'nmo:hasIssuer', knowledge_path_predicate: str = 'nmo:hasPortait',
+                 domain_knowledge_predicate: str = 'ex:hasPossibleIssuers', ignorance_object: str = 'ex:uncertain',
+                 ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.05, group: str = "Undefined"):
+        """
+        :param target_predicate: Issuer predicate
+        :param knowledge_path_predicate: Issuing for predicate
+        :param domain_knowledge_predicate: Domain knowledge predicate
+        :param ignorance_object: Object that increases ignorance for the mass function
+        :param ignorance: Default ignorance
+        :param domain_knowledge_ignorance: Default ignorance for the domain knowledge
+        """
+        super().__init__("preprocessing", group)
+        self.target_predicate = target_predicate
+        self.knowledge_path_predicate = knowledge_path_predicate
+        self.domain_knowledge_predicate = domain_knowledge_predicate
+        self.domain_knowledge_ignorance = domain_knowledge_ignorance
+        self.ignorance = ignorance
+        self.ignorance_object = ignorance_object
+        self.plausibility = dict()
+        self.beliefs = dict()
+
+    def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
+        df_domain_knowledge = df_triples[(df_triples['p'] == self.domain_knowledge_predicate)].copy()
+        df_target = df_triples[(df_triples['p'] == self.target_predicate)].copy()
+        df_knowledge_path = df_triples[(df_triples['p'] == self.knowledge_path_predicate)].copy()
+
+        result = pd.DataFrame()
+
+        for i, coin in df_target['s'].drop_duplicates().items():
+            df_target_subsets = df_target[df_target['s'] == coin]
+            df_knowledge_path_subsets = df_knowledge_path[df_knowledge_path['s'] == coin]
+
+            if df_knowledge_path_subsets.shape[0] == 0:
+                result = pd.concat([result, df_target_subsets])
+                continue
+
+            target_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_target_subsets, self.ignorance, self.ignorance_object))
+
+            knowledge_ignorance = self.domain_knowledge_ignorance
+            df_knowledge_path_ignorance = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] == self.ignorance_object]
+            if df_knowledge_path_ignorance.shape[0] == 1:
+                knowledge_ignorance += df_knowledge_path_ignorance['weight'].iloc[0]
+
+            df_knowledge_path_subsets = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] != self.ignorance_object]
+            for j, knowledge_path in df_knowledge_path_subsets['o'].items():
+                df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == knowledge_path]
+                if not df_domain_knowledge_subsets.empty:
+                    domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, knowledge_ignorance, self.ignorance_object))
+                    target_mass_function = target_mass_function.join_masses(domain_knowledge_mass_function)
+
+            result_tmp = {
+                's': [],
+                'p': [],
+                'o': [],
+                'weight': []
+            }
+            mass_values = target_mass_function.get_mass_values()
+            for target in mass_values:
+                if target == "*":
+                    result_tmp['s'].append(coin)
+                    result_tmp['p'].append(self.target_predicate)
+                    result_tmp['o'].append(self.ignorance_object)
+                    result_tmp['weight'].append(mass_values[target])
+                    continue
+                result_tmp['s'].append(coin)
+                result_tmp['p'].append(self.target_predicate)
+                result_tmp['o'].append(target)
+                result_tmp['weight'].append(mass_values[target])
+
+            result_tmp = pd.DataFrame(result_tmp)
+            result = pd.concat([result, result_tmp])
+
+        result['weight'] = result['weight'].round(3)
+        df_triples = pd.concat([df_triples[df_triples['p'] != self.target_predicate], result])
+
         return df_triples
 
 
