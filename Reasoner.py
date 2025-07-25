@@ -94,13 +94,60 @@ class Reasoner:
         if len(self._preprocessing_axioms) != 0:
             logger.info(f"Starting preprocessing.")
             start_postprocessing = time.time()
-            for axiom in self._preprocessing_axioms:
-                self._df_triples = axiom.reason(self._df_triples, self._df_classes).reset_index(drop=True)
-                self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
-            end_postprocessing = time.time()
 
+            visited = set()
+
+            for i, axiom in enumerate(self._preprocessing_axioms):
+                if i in visited:
+                    continue
+
+                axiom_group = axiom.get_group()
+
+                # Grouped axioms that should be run in parallel on same base data
+                if axiom_group != "Undefined":
+                    group_axioms = [
+                        other_axiom for j, other_axiom in
+                        enumerate(self._preprocessing_axioms)
+                        if
+                        other_axiom.get_group() == axiom_group and j not in visited
+                    ]
+
+                    # Mark all as visited
+                    visited.update(j for j, other_axiom in
+                                   enumerate(self._preprocessing_axioms)
+                                   if other_axiom.get_group() == axiom_group)
+
+                    # Deep copies of the base data
+                    df_triples_copies = [self._df_triples.copy(deep=True) for _
+                                         in group_axioms]
+                    df_classes_copies = [self._df_classes.copy(deep=True) for _
+                                         in group_axioms]
+
+                    # Apply all group axioms on the same base data
+                    results = []
+                    for ax, df_t, df_c in zip(group_axioms, df_triples_copies, df_classes_copies):
+                        df_result = ax.reason(df_t, df_c).reset_index( drop=True)
+
+                        if hasattr(ax, 'knowledge_path_predicate'):
+                            df_result = df_result[df_result['p'] != ax.knowledge_path_predicate]
+
+                        results.append(df_result)
+
+                    # Combine results and deduplicate
+                    self._df_triples = pd.concat(results, ignore_index=True).drop_duplicates()
+                    self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
+
+                else:
+                    # For undefined group → apply directly
+                    self._df_triples = axiom.reason(self._df_triples, self._df_classes).reset_index(drop=True)
+                    self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
+                    visited.add(i)
+
+            end_postprocessing = time.time()
             logger.info(f"Preprocessing done in {round(end_postprocessing - start_postprocessing, 3)} seconds.")
+
         self._df_triples = self._df_triples[self._df_triples['model'].isna()].copy()
+
         if len(self._rule_reasoning_axioms) != 0:
             logger.info(f"Starting rule based reasoning.")
             start_rule_reasoning = time.time()
@@ -170,17 +217,24 @@ class Axiom(ABC):
     """
     Abstract Axiom class to implement reasoning axioms
     """
-    def __init__(self, stage: Literal['preprocessing', 'rule_based_reasoning', 'postprocessing'], group):
+    def __init__(self, stage: Literal['preprocessing', 'rule_based_reasoning', 'postprocessing'], group: str):
         """
         :param stage: Defines the reasoning stage: preprocessing, rule_based_reasoning or postprocessing
         """
         self._stage = stage
+        self._group = group
 
     def get_stage(self) -> str:
         """
         :return: Returns the stage of the axiom
         """
         return self._stage
+
+    def get_group(self) -> str:
+        """
+        :return: Returns the group name to which the axiom belong
+        """
+        return self._group
 
     @abstractmethod
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
