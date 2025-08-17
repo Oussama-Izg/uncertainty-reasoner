@@ -24,17 +24,67 @@ def run_use_cases():
         Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
         Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
         Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
+        Reasoner.AFEDempsterShaferAxiom_2('nmo:hasIssuer', 'nmo:hasPortrait',
+                                        'ex:hasPossibleIssuers')
+    ]
+
+    axioms1 = [
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
+        Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
+        Reasoner.CertaintyAssignmentAxiom("ex:inPossibleIssuersOf"),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasIssuer",
+                                          knowledge_path_predicate="nmo:hasPortrait",
+                                          domain_knowledge_predicate="ex:hasPossibleIssuers",
+                                          group="1",
+                                          target_ignorance=0.2,
+                                          domain_knowledge_ignorance=0.2),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasPortrait",
+                                          knowledge_path_predicate="nmo:hasIssuer",
+                                          domain_knowledge_predicate="ex:inPossibleIssuersOf",
+                                          group="1",
+                                          target_ignorance=0.2,
+                                          domain_knowledge_ignorance=0.2)
+
+    ]
+
+    axioms2 = [
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
+        Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
+        Reasoner.CertaintyAssignmentAxiom("ex:inPossibleIssuersOf"),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasIssuer",
+                                          knowledge_path_predicate="nmo:hasPortrait",
+                                          domain_knowledge_predicate="ex:hasPossibleIssuers",
+                                          target_ignorance=0.2,
+                                          domain_knowledge_ignorance=0.05),
+        Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasPortrait",
+                                          knowledge_path_predicate="nmo:hasIssuer",
+                                          domain_knowledge_predicate="ex:inPossibleIssuersOf",
+                                          target_ignorance=0.2,
+                                          domain_knowledge_ignorance=0.2)
+    ]
+
+    axioms3 = [
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
+        Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
+        Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
         Reasoner.CertaintyAssignmentAxiom("ex:inPossibleIssuersOf"),
         Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasPortrait",
                                           knowledge_path_predicate="nmo:hasIssuer",
-                                          domain_knowledge_predicate="ex:inPossibleIssuersOf"),
+                                          domain_knowledge_predicate="ex:inPossibleIssuersOf",
+                                          target_ignorance=0.2,
+                                          domain_knowledge_ignorance=0.2),
         Reasoner.AFEDempsterShaferAxiom_2(target_predicate="nmo:hasIssuer",
                                           knowledge_path_predicate="nmo:hasPortrait",
-                                          domain_knowledge_predicate="ex:hasPossibleIssuers")
+                                          domain_knowledge_predicate="ex:hasPossibleIssuers",
+                                          target_ignorance=0.2,
+                                          domain_knowledge_ignorance=0.2)
+
     ]
 
     # Path to the root directory containing all test case folders
-    root_dir = "usecase_2_4"
+    root_dir = "thesis_cases"
 
     for folder_name in os.listdir(root_dir):
         folder_path = os.path.join(root_dir, folder_name)
@@ -42,7 +92,7 @@ def run_use_cases():
         if os.path.isdir(folder_path):
             # Loop through all CSV files in the folder
             for filename in os.listdir(folder_path):
-                if filename.endswith(".csv") and ("usecase_9" in filename or "usecase_10" in filename):
+                if filename.endswith(".csv") and "Depicted_Person_certain__Issuer_uncertain__positive.csv" in filename:
                     # if filename.endswith(".csv") and "result" not in filename:
                     csv_path = os.path.join(folder_path, filename)
                     df = pd.read_csv(csv_path)
@@ -60,6 +110,7 @@ def run_use_cases():
                     results_file_name = f"result_{filename}"
                     result_path = os.path.join(folder_path, results_file_name)
                     results_df.to_csv(result_path, index=False)
+                    reasoner.save_data_to_file("result.ttl", conn)
 
                     print(
                         f"Reasoning Results from Reasoner1 are stored in {result_path}")
@@ -70,7 +121,7 @@ def run_use_cases():
 
 def delete_results():
     # Walk through all directories and files
-    for folder_path, _, files in os.walk("usecase_2_4"):
+    for folder_path, _, files in os.walk("thesis_cases"):
         for filename in files:
             if "result_" in filename:
                 file_path = os.path.join(folder_path, filename)

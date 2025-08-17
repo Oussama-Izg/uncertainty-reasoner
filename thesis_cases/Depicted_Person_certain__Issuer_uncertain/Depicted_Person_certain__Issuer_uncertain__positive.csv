@@ -1,0 +1,7 @@
+s,p,o,weight,model,
+ex:coin_12365,nmo:hasIssuer,ex:Augustus,1.0,,NULL
+ex:coin_12365,nmo:hasIssuer,ex:uncertain,1.0,,NULL
+ex:coin_12365,nmo:hasPortrait,ex:Tiberius,1.0,,NULL
+ex:coin_12365,nmo:hasPortrait,ex:uncertain,1.0,,NULL
+ex:Tiberius,ex:hasPossibleIssuers,ex:Augustus,1.0,,NULL
+ex:Tiberius,ex:hasPossibleIssuers,ex:Tiberius,1.0,,NULL

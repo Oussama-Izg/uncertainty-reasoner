@@ -1,0 +1,9 @@
+s,p,o,weight,model
+ex:coin_36911,nmo:hasIssuer,ex:Quintillus,1.0,
+ex:coin_36911,nmo:hasIssuer,ex:Tetricus_I,1.0,
+ex:coin_36911,nmo:hasPortrait,ex:Divus_Claudius_II,1.0,
+ex:coin_36911,nmo:hasPortrait,ex:uncertain,1.0,
+ex:Divus_Claudius_II,ex:hasPossibleIssuers,ex:Claudius_II,1.0,
+ex:Claudius_II,ex:inPossibleIssuersOf,ex:Divus_Claudius_II,1.0,
+ex:Tetricus_I,ex:inPossibleIssuersOf,ex:Tetricus_II,1.0,
+ex:Tetricus_II,ex:hasPossibleIssuers,ex:Tetricus_I,1.0,

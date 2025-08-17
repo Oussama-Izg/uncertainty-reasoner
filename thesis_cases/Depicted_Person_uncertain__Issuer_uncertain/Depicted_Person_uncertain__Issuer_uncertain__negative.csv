@@ -1,0 +1,6 @@
+s,p,o,weight,model
+ex:coin_34828,nmo:hasIssuer,ex:issuer_114,1.0,
+ex:coin_34828,nmo:hasIssuer,ex:uncertain,1.0,
+ex:coin_34828,nmo:hasPortrait,ex:person_57,1.0,
+ex:coin_34828,nmo:hasPortrait,ex:uncertain,1.0,
+ex:person_57,ex:hasPossibleIssuers,ex:issuer_113,1.0,

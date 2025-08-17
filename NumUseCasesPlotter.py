@@ -106,10 +106,10 @@ def analyze_use_cases_split_view_v2(folder_path: str):
             fmt='d',
             cmap='Blues',
             linewidths=0.5,
-            cbar_kws={'label': f'Number of {title}'}
+            cbar_kws={'label': f'Number of Coins'}
         )
         cbar = ax.collections[0].colorbar
-        cbar.set_label(f'Number of {title}', labelpad=20)
+        cbar.set_label(f'Number of Coins', labelpad=20)
         plt.title(
             f"{title} Usecases",
             fontsize=16, weight='bold', pad=30, loc='center'

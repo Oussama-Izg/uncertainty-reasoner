@@ -74,6 +74,7 @@ def create_issuer_triples(filepath: str, target_path: str):
 def create_issuing_for_triples(filepath: str, target_path: str):
     df = pd.read_excel(filepath)
     df = df.drop_duplicates()
+    df = df[df["CoinImage_Uncertainty_mapped"].notna()]
     df = df[
         ['id', 'CoinImage', 'CoinImage2', 'CoinImage_Uncertainty_mapped']]
 

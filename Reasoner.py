@@ -111,6 +111,7 @@ class Reasoner:
                         if
                         other_axiom.get_group() == axiom_group and j not in visited
                     ]
+                    print(group_axioms)
 
                     # Mark all as visited
                     visited.update(j for j, other_axiom in
@@ -126,7 +127,11 @@ class Reasoner:
                     # Apply all group axioms on the same base data
                     results = []
                     for ax, df_t, df_c in zip(group_axioms, df_triples_copies, df_classes_copies):
+                        print(f"Data before {ax.__class__.__name__} on  {ax.target_predicate}")
+                        print(df_t)
                         df_result = ax.reason(df_t, df_c).reset_index(drop=True)
+                        print(f"Data after {ax.__class__.__name__} on  {ax.target_predicate}")
+                        print(df_result)
 
                         #print(ax.target_predicate)
 
@@ -468,7 +473,7 @@ class AFEDempsterShaferAxiom_2(Axiom):
     """
     def __init__(self, target_predicate: str = 'nmo:hasIssuer', knowledge_path_predicate: str = 'nmo:hasPortait',
                  domain_knowledge_predicate: str = 'ex:hasPossibleIssuers', ignorance_object: str = 'ex:uncertain',
-                 ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.05, group: str = "Undefined"):
+                 target_ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.2, group: str = "Undefined"):
         """
         :param target_predicate: Issuer predicate
         :param knowledge_path_predicate: Issuing for predicate
@@ -482,7 +487,7 @@ class AFEDempsterShaferAxiom_2(Axiom):
         self.knowledge_path_predicate = knowledge_path_predicate
         self.domain_knowledge_predicate = domain_knowledge_predicate
         self.domain_knowledge_ignorance = domain_knowledge_ignorance
-        self.ignorance = ignorance
+        self.target_ignorance = target_ignorance
         self.ignorance_object = ignorance_object
         self.plausibility = dict()
         self.beliefs = dict()
@@ -502,8 +507,10 @@ class AFEDempsterShaferAxiom_2(Axiom):
                 result = pd.concat([result, df_target_subsets])
                 continue
 
-            target_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_target_subsets, self.ignorance, self.ignorance_object))
+            target_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_target_subsets, self.target_ignorance, self.ignorance_object))
 
+            print("user mass function")
+            print(target_mass_function.get_mass_values())
             knowledge_ignorance = self.domain_knowledge_ignorance
             df_knowledge_path_ignorance = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] == self.ignorance_object]
             if df_knowledge_path_ignorance.shape[0] == 1:
@@ -514,7 +521,12 @@ class AFEDempsterShaferAxiom_2(Axiom):
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == knowledge_path]
                 if not df_domain_knowledge_subsets.empty:
                     domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, knowledge_ignorance, self.ignorance_object))
+                    print("domain_knowledger mass function")
+                    print(domain_knowledge_mass_function.get_mass_values())
                     target_mass_function = target_mass_function.join_masses(domain_knowledge_mass_function)
+
+            print("Join Mass function")
+            print(target_mass_function.get_mass_values())
 
             result_tmp = {
                 's': [],
