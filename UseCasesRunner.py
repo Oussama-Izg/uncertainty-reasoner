@@ -25,7 +25,7 @@ def run_use_cases():
         Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
         Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
         Reasoner.AFEDempsterShaferAxiom_2('nmo:hasIssuer', 'nmo:hasPortrait',
-                                        'ex:hasPossibleIssuers')
+                                        'ex:hasPossibleIssuers', domain_knowledge_ignorance=0.02)
     ]
 
     axioms1 = [
@@ -92,7 +92,7 @@ def run_use_cases():
         if os.path.isdir(folder_path):
             # Loop through all CSV files in the folder
             for filename in os.listdir(folder_path):
-                if filename.endswith(".csv") and "Depicted_Person_certain__Issuer_uncertain__positive.csv" in filename:
+                if filename.endswith(".csv") and "Depicted_Person_certain__Issuer_certain__negative.csv" in filename:
                     # if filename.endswith(".csv") and "result" not in filename:
                     csv_path = os.path.join(folder_path, filename)
                     df = pd.read_csv(csv_path)

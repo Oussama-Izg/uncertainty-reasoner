@@ -287,7 +287,7 @@ class AggregationAxiom(Axiom):
         return pd.concat([df_triples, df_agg], ignore_index=True).drop_duplicates()
 
 
-class CertaintyAssignmentAxiom (Axiom):
+class CertaintyAssignmentAxiom(Axiom):
     """
     Uses a heuristic to assign certainty weights to triples.
     """
