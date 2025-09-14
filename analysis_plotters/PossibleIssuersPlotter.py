@@ -168,29 +168,27 @@ def save_csv(df: pd.DataFrame, out_path: Path):
 
 # ---------- main ----------
 def main():
-    outdir = Path("./analysis_results")
+    outdir = Path("../analysis_results")
 
-    domain_csv = Path("triples/domain_knowledge_triples.csv")
+    domain_csv = Path("../triples/domain_knowledge_triples.csv")
     usecase_csv = Path(
-        "real_world_usecases/Depicted_Person_certain__Issuer_certain/Depicted_Person_certain__Issuer_certain__negative.csv")
+        "../real_world_usecases/Depicted_Person_certain__Issuer_certain/Depicted_Person_certain__Issuer_certain__negative.csv")
 
     # Domain dataset
     df_domain = pd.read_csv(domain_csv)
     df_domain.columns = [c.strip() for c in df_domain.columns]
     freq_domain = compute_freq_domain(df_domain)
-    save_csv(freq_domain, outdir / "frequency_domain.csv")
     plot_frequency(freq_domain,
                    title="Distribution of Possible Issuers per Depicted Person — Domain Knowledge Dataset",
-                   out_path=outdir / "plot_frequency_domain.png")
+                   out_path=outdir / "domain_knowledge_frequency.png")
 
     # Specific use case dataset
     df_usecase = pd.read_csv(usecase_csv)
     df_usecase.columns = [c.strip() for c in df_usecase.columns]
     freq_usecase = compute_freq_usecase(df_usecase)
-    save_csv(freq_usecase, outdir / "frequency_usecase.csv")
     plot_frequency(freq_usecase,
                    title="Distribution of Possible Issuers per Depicted Person — Subset of 430 Coins in Negative Case (SC–SC)",
-                   out_path=outdir / "plot_frequency_usecase.png")
+                   out_path=outdir / "domain_knowledge_SC_SC_cases_frequency.png")
 
 
 if __name__ == "__main__":

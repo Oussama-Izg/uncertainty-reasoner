@@ -1,0 +1,13 @@
+s,p,o,weight,model
+ex:coin_42318,nmo:hasIssuer,ex:issuer_151,1.0,
+ex:coin_42318,nmo:hasIssuer,ex:issuer_161,1.0,
+ex:coin_42318,nmo:hasPortrait,ex:person_70,1.0,
+ex:coin_42318,nmo:hasPortrait,ex:uncertain,1.0,
+ex:person_70,ex:hasPossibleIssuers,ex:issuer_59,1.0,
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_34,1.0,
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_39,1.0,
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_40,1.0,
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_41,1.0,
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_43,1.0,
+ex:issuer_151,ex:inPossibleIssuersOf,ex:person_120,1.0,
+ex:issuer_161,ex:inPossibleIssuersOf,ex:person_34,1.0,

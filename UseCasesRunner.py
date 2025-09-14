@@ -5,7 +5,7 @@ import pandas as pd
 import os
 
 
-def run_use_cases():
+def run_use_cases(root_folder_name):
     # Query endpoint
     QUERY_ENDPOINT = "http://localhost:3030/test/query"
     # Update endpoint
@@ -84,7 +84,7 @@ def run_use_cases():
     ]
 
     # Path to the root directory containing all test case folders
-    root_dir = "thesis_cases"
+    root_dir = root_folder_name
 
     for folder_name in os.listdir(root_dir):
         folder_path = os.path.join(root_dir, folder_name)
@@ -101,7 +101,7 @@ def run_use_cases():
                     conn.upload_df(df)
 
                     # upload the data from the triple store and reason upon it
-                    reasoner = Reasoner.Reasoner(axioms)
+                    reasoner = Reasoner.Reasoner(axioms3)
                     reasoner.load_data_from_endpoint(conn)
                     reasoner.reason()
 
@@ -119,9 +119,9 @@ def run_use_cases():
                     conn.delete_query(delete_all=True)
 
 
-def delete_results():
+def delete_results(root_folder_name):
     # Walk through all directories and files
-    for folder_path, _, files in os.walk("thesis_cases"):
+    for folder_path, _, files in os.walk(root_folder_name):
         for filename in files:
             if "result_" in filename:
                 file_path = os.path.join(folder_path, filename)
@@ -130,5 +130,5 @@ def delete_results():
 
 
 if __name__ == "__main__":
-    delete_results()
-    run_use_cases()
+    delete_results("thesis_cases")
+    run_use_cases("thesis_cases")

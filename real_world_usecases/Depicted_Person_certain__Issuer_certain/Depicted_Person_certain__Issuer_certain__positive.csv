@@ -1,4 +1,4 @@
-s,p,o,weight,model,
+s,p,o,weight,model
 ex:coin_1534,nmo:hasIssuer,ex:issuer_33,1.0,
 ex:coin_1534,nmo:hasPortrait,ex:person_2,1.0,
 ex:person_2,ex:hasPossibleIssuers,ex:issuer_33,1.0,

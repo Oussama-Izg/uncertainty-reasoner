@@ -1,5 +1,5 @@
-s,o,p,weight,model,
-ex:coin_11454,ex:issuer_114,nmo:hasIssuer,1.0,
-ex:coin_11454,ex:issuer_116,nmo:hasIssuer,1.0,
-ex:coin_11454,ex:person_57,nmo:hasPortrait,1.0,
-ex:person_57,ex:issuer_113,ex:hasPossibleIssuers,1.0,
+s,p,o,weight,model,
+ex:coin_11454,nmo:hasIssuer,ex:issuer_114,1.0,,NULL
+ex:coin_11454,nmo:hasIssuer,ex:issuer_116,1.0,,NULL
+ex:coin_11454,nmo:hasPortrait,ex:person_57,1.0,,NULL
+ex:person_57,ex:hasPossibleIssuers,ex:issuer_113,1.0,,NULL

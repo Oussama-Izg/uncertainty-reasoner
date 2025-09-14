@@ -1,5 +1,8 @@
 import logging
 from typing import Literal
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+import math
 
 import pandas as pd
 import numpy as np
@@ -10,10 +13,8 @@ from SparqlConnector import SparqlBaseConnector
 from abc import ABC, abstractmethod
 from Exceptions import ConstraintException
 
-logger = logging.getLogger(__name__)
 
-pd.set_option('display.max_columns', None)
-pd.set_option('display.max_colwidth', None)
+logger = logging.getLogger(__name__)
 
 
 class Reasoner:
@@ -98,54 +99,87 @@ class Reasoner:
             visited = set()
 
             for i, axiom in enumerate(self._preprocessing_axioms):
+
                 if i in visited:
                     continue
 
-                axiom_group = axiom.get_group()
+                if isinstance(axiom, AFEDempsterShaferAxiom_2):
+                    axiom_group = axiom.get_group()
 
-                # Grouped axioms that should be run in parallel on same base data
-                if axiom_group != "Undefined":
-                    group_axioms = [
-                        other_axiom for j, other_axiom in
-                        enumerate(self._preprocessing_axioms)
-                        if
-                        other_axiom.get_group() == axiom_group and j not in visited
-                    ]
-                    print(group_axioms)
+                    # Grouped AFEDempsterShaferAxiom_2 instances that should be run in parallel on same base data
+                    if axiom_group != "Undefined":
+                        group_axioms = []
+                        for j, other_axiom in enumerate(self._preprocessing_axioms):
+                            if j in visited:
+                                continue
+                            if not isinstance(other_axiom, AFEDempsterShaferAxiom_2):
+                                continue
+                            if other_axiom.get_group() == axiom_group:
+                                group_axioms.append(other_axiom)
+                        logger.debug("Grouped axioms: %s",
+                                     [ax.__class__.__name__ for ax in
+                                      group_axioms])
 
-                    # Mark all as visited
-                    visited.update(j for j, other_axiom in
-                                   enumerate(self._preprocessing_axioms)
-                                   if other_axiom.get_group() == axiom_group)
+                        # Mark all as visited
+                        visited.update(
+                            j for j, other_axiom in enumerate(self._preprocessing_axioms)
+                            if isinstance(other_axiom, AFEDempsterShaferAxiom_2)
+                            and other_axiom.get_group() == axiom_group
+                        )
 
-                    # Deep copies of the base data
-                    df_triples_copies = [self._df_triples.copy(deep=True) for _
-                                         in group_axioms]
-                    df_classes_copies = [self._df_classes.copy(deep=True) for _
-                                         in group_axioms]
+                        # each axiom runs on its own deep copies of the SAME base data
+                        def _run_axiom(ax):
+                            df_t = self._df_triples.copy(deep=True)
+                            df_c = self._df_classes.copy(deep=True)
 
-                    # Apply all group axioms on the same base data
-                    results = []
-                    for ax, df_t, df_c in zip(group_axioms, df_triples_copies, df_classes_copies):
-                        print(f"Data before {ax.__class__.__name__} on  {ax.target_predicate}")
-                        print(df_t)
-                        df_result = ax.reason(df_t, df_c).reset_index(drop=True)
-                        print(f"Data after {ax.__class__.__name__} on  {ax.target_predicate}")
-                        print(df_result)
+                            df_result = ax.reason(df_t, df_c).reset_index(
+                                drop=True)
 
-                        #print(ax.target_predicate)
+                            # Strip helper predicate if present to keep the consistencies
+                            if hasattr(ax, 'knowledge_path_predicate'):
+                                df_result = df_result[
+                                    df_result[
+                                        'p'] != ax.knowledge_path_predicate]
 
-                        if hasattr(ax, 'knowledge_path_predicate'):
-                            df_result = df_result[df_result['p'] != ax.knowledge_path_predicate]
+                            # Ensure consistent column order
+                            expected_cols = ['s', 'p', 'o', 'weight', 'model']
+                            df_result = df_result[[c for c in expected_cols if
+                                                   c in df_result.columns]]
+                            return df_result
 
-                        results.append(df_result)
+                        # Run in parallel
+                        max_workers = min(len(group_axioms),
+                                          os.cpu_count() or 4)
+                        results = []
+                        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+                            futures = {ex.submit(_run_axiom, ax): ax for ax in
+                                       group_axioms}
+                            for fut in as_completed(futures):
+                                ax = futures[fut]
+                                try:
+                                    results.append(fut.result())
+                                except Exception as e:
+                                    logger.exception("Axiom %s failed: %s",
+                                                     ax.__class__.__name__, e)
+                                    raise
 
-                    # Combine results and deduplicate
-                    self._df_triples = pd.concat(results, ignore_index=True).drop_duplicates()
-                    self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
+                        # Combine results and deduplicate
+                        if results:
+                            combined = pd.concat(results,
+                                                 ignore_index=True).drop_duplicates()
+                            self._df_triples = combined[
+                                ['s', 'p', 'o', 'weight', 'model']]
+                        else:
+                            # If there's results, then keep the base data unchanged
+                            logger.debug("No results produced by group '%s'.",
+                                         axiom_group)
+                    else:
+                        self._df_triples = axiom.reason(self._df_triples, self._df_classes).reset_index(drop=True)
+                        self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
+                        visited.add(i)
 
                 else:
-                    # For undefined group → apply directly
+                    # For undefined group, apply directly as usual
                     self._df_triples = axiom.reason(self._df_triples, self._df_classes).reset_index(drop=True)
                     self._df_triples = self._df_triples[['s', 'p', 'o', 'weight', 'model']]
                     visited.add(i)
@@ -224,24 +258,17 @@ class Axiom(ABC):
     """
     Abstract Axiom class to implement reasoning axioms
     """
-    def __init__(self, stage: Literal['preprocessing', 'rule_based_reasoning', 'postprocessing'], group: str):
+    def __init__(self, stage: Literal['preprocessing', 'rule_based_reasoning', 'postprocessing']):
         """
         :param stage: Defines the reasoning stage: preprocessing, rule_based_reasoning or postprocessing
         """
         self._stage = stage
-        self._group = group
 
     def get_stage(self) -> str:
         """
         :return: Returns the stage of the axiom
         """
         return self._stage
-
-    def get_group(self) -> str:
-        """
-        :return: Returns the group name to which the axiom belong
-        """
-        return self._group
 
     @abstractmethod
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
@@ -258,12 +285,12 @@ class AggregationAxiom(Axiom):
     """
     Axiom to aggregate weights by model using simple aggregation functions
     """
-    def __init__(self, predicate: str, aggregation_type: Literal["mean", "median"], group: str = "Undefined"):
+    def __init__(self, predicate: str, aggregation_type: Literal["mean", "median"]):
         """
         :param predicate: Predicate to aggregate
         :param aggregation_type: Aggregation type
         """
-        super().__init__("preprocessing", group)
+        super().__init__("preprocessing")
         self.predicate = predicate
 
         if aggregation_type not in ['mean', 'median']:
@@ -291,13 +318,13 @@ class CertaintyAssignmentAxiom(Axiom):
     """
     Uses a heuristic to assign certainty weights to triples.
     """
-    def __init__(self, predicate: str, uncertainty_object: str = "ex:uncertain", uncertainty_value: float = 0.2, group: str = "Undefined"):
+    def __init__(self, predicate: str, uncertainty_object: str = "ex:uncertain", uncertainty_value: float = 0.2):
         """
         :param predicate: The predicate to use
         :param uncertainty_object: Object indicating uncertainty about the selection
         :param uncertainty_value: Certainty value for the uncertainty object
         """
-        super().__init__("preprocessing", group)
+        super().__init__("preprocessing")
         self.predicate = predicate
         self.uncertainty_object = uncertainty_object
         self.uncertainty_value = uncertainty_value
@@ -331,13 +358,13 @@ class DempsterShaferAxiom(Axiom):
     only be used for certainty weights.
     """
     def __init__(self, predicate: str, ignorance_object: str = 'ex:uncertain', ignorance: dict[str, float] = None,
-                 default_ignorance: float = 0.2, group: str = "Undefined"):
+                 default_ignorance: float = 0.2):
         """
         :param predicate: Predicate to aggregate
         :param ignorance_object: Object that increases ignorance for the mass function
         :param default_ignorance: Default ignorance
         """
-        super().__init__("preprocessing", group)
+        super().__init__("preprocessing")
         if ignorance is None:
             ignorance = {}
         self.predicate = predicate
@@ -399,7 +426,7 @@ class AFEDempsterShaferAxiom(Axiom):
     """
     def __init__(self, issuer_predicate: str = 'ex:issuer', issuing_for_predicate: str = 'ex:issuing_for',
                  domain_knowledge_predicate: str = 'ex:domain_knowledge', ignorance_object: str = 'ex:uncertain',
-                 ignorance: float = 0.2, group: str = "Undefined"):
+                 ignorance: float = 0.2):
         """
         :param issuer_predicate: Issuer predicate
         :param issuing_for_predicate: Issuing for predicate
@@ -407,7 +434,7 @@ class AFEDempsterShaferAxiom(Axiom):
         :param ignorance_object: Object that increases ignorance for the mass function
         :param ignorance: Default ignorance
         """
-        super().__init__("preprocessing", group)
+        super().__init__("preprocessing")
         self.issuer_predicate = issuer_predicate
         self.ignorance = ignorance
         self.ignorance_object = ignorance_object
@@ -473,7 +500,8 @@ class AFEDempsterShaferAxiom_2(Axiom):
     """
     def __init__(self, target_predicate: str = 'nmo:hasIssuer', knowledge_path_predicate: str = 'nmo:hasPortait',
                  domain_knowledge_predicate: str = 'ex:hasPossibleIssuers', ignorance_object: str = 'ex:uncertain',
-                 target_ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.2, group: str = "Undefined"):
+                 target_ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.2, group: str = "Undefined",
+                 auto_tune_domain_ignorance: bool = False):
         """
         :param target_predicate: Issuer predicate
         :param knowledge_path_predicate: Issuing for predicate
@@ -481,16 +509,25 @@ class AFEDempsterShaferAxiom_2(Axiom):
         :param ignorance_object: Object that increases ignorance for the mass function
         :param ignorance: Default ignorance
         :param domain_knowledge_ignorance: Default ignorance for the domain knowledge
+        :param auto_tune_domain_ignorance: Flag to auto tune the domain knowledge ignorance to prioritize the domain knowledge suggestion
         """
-        super().__init__("preprocessing", group)
+        super().__init__("preprocessing")
         self.target_predicate = target_predicate
         self.knowledge_path_predicate = knowledge_path_predicate
         self.domain_knowledge_predicate = domain_knowledge_predicate
         self.domain_knowledge_ignorance = domain_knowledge_ignorance
         self.target_ignorance = target_ignorance
         self.ignorance_object = ignorance_object
+        self.auto_tune_domain_ignorance = auto_tune_domain_ignorance
         self.plausibility = dict()
         self.beliefs = dict()
+        self.group = group
+
+    def get_group(self) -> str:
+        """
+        :return: Returns the group name to which the axiom belong
+        """
+        return self.group
 
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
         df_domain_knowledge = df_triples[(df_triples['p'] == self.domain_knowledge_predicate)].copy()
@@ -509,24 +546,24 @@ class AFEDempsterShaferAxiom_2(Axiom):
 
             target_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_target_subsets, self.target_ignorance, self.ignorance_object))
 
-            print("user mass function")
-            print(target_mass_function.get_mass_values())
-            knowledge_ignorance = self.domain_knowledge_ignorance
-            df_knowledge_path_ignorance = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] == self.ignorance_object]
-            if df_knowledge_path_ignorance.shape[0] == 1:
-                knowledge_ignorance += df_knowledge_path_ignorance['weight'].iloc[0]
+            knowledge_ignorance_tuning_conditions = self.check_conditions_for_tuning(df_target, df_knowledge_path, df_domain_knowledge)
 
-            df_knowledge_path_subsets = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] != self.ignorance_object]
-            for j, knowledge_path in df_knowledge_path_subsets['o'].items():
+            df_knowledge_path_subsets_temp = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] != self.ignorance_object]
+
+            for j, knowledge_path in df_knowledge_path_subsets_temp['o'].items():
                 df_domain_knowledge_subsets = df_domain_knowledge[df_domain_knowledge['s'] == knowledge_path]
-                if not df_domain_knowledge_subsets.empty:
-                    domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, knowledge_ignorance, self.ignorance_object))
-                    print("domain_knowledger mass function")
-                    print(domain_knowledge_mass_function.get_mass_values())
-                    target_mass_function = target_mass_function.join_masses(domain_knowledge_mass_function)
 
-            print("Join Mass function")
-            print(target_mass_function.get_mass_values())
+                if not df_domain_knowledge_subsets.empty:
+                    if knowledge_ignorance_tuning_conditions:
+                        knowledge_ignorance = self._tune_domain_ignorance(df_target, df_domain_knowledge_subsets)
+                    else:
+                        knowledge_ignorance = self.domain_knowledge_ignorance
+                    df_knowledge_path_ignorance = df_knowledge_path_subsets[df_knowledge_path_subsets['o'] == self.ignorance_object]
+                    if df_knowledge_path_ignorance.shape[0] == 1:
+                        knowledge_ignorance += df_knowledge_path_ignorance['weight'].iloc[0]
+
+                    domain_knowledge_mass_function = DempsterShafer.MassFunction(DempsterShafer.df_to_subset_dict(df_domain_knowledge_subsets, knowledge_ignorance, self.ignorance_object))
+                    target_mass_function = target_mass_function.join_masses(domain_knowledge_mass_function)
 
             result_tmp = {
                 's': [],
@@ -555,6 +592,71 @@ class AFEDempsterShaferAxiom_2(Axiom):
 
         return df_triples
 
+    def check_conditions_for_tuning(self, df_target_subsets: pd.DataFrame,
+                                    df_knowledge_path_subsets: pd.DataFrame,
+                                    df_domain_knowledge: pd.DataFrame):
+        """
+        if the user set the auto_tune_domain_ignorance to true,
+        check if the case really need the tuning of the domain knowledge ignorance
+        """
+        if not self.auto_tune_domain_ignorance:
+            return False
+
+        # user issuers (exclude 'uncertain')
+        user_selected_targets = set(df_target_subsets.loc[df_target_subsets[
+                                                     'o'] != self.ignorance_object, 'o'])
+
+        user_selected_domain_path = set(
+            df_knowledge_path_subsets.loc[df_knowledge_path_subsets[
+                                              'o'] != self.ignorance_object, 'o'])
+        expert_suggestions = set(df_domain_knowledge.loc[
+                                     df_domain_knowledge['s'].isin(
+                                         user_selected_domain_path), 'o'])
+
+        if not user_selected_targets or not expert_suggestions or not user_selected_targets.isdisjoint(
+                expert_suggestions):
+            return False
+
+        # check certainty states
+        def certainty_state(df_subsets: pd.DataFrame) -> str:
+            if df_subsets.empty:
+                return 'empty'
+            return 'uncertain' if (df_subsets['o'] == self.ignorance_object).any() else 'certain'
+
+        # we require both to be 'certain' or both 'uncertain' to scale ignorance
+        if not (certainty_state(df_target_subsets) == certainty_state(df_knowledge_path_subsets)
+                and certainty_state(df_target_subsets) in ('certain', 'uncertain')
+        ):
+            return False
+
+        return True
+
+    def _tune_domain_ignorance(
+            self,
+            df_target: pd.DataFrame,
+            df_domain_knowledge: pd.DataFrame,
+    ) -> float:
+        """
+        Apply the rule D < (Ux)/(Ux + k(1-U)) .
+        """
+        # user selected target values (exclude 'uncertain')
+        user_targets = set(df_target.loc[df_target['o'] != self.ignorance_object, 'o'])
+        x = len(user_targets)
+
+        k = len(df_domain_knowledge)
+
+        # apply the rule
+        U = self.target_ignorance
+        if x <= 0 or k <= 0:
+            return self.domain_knowledge_ignorance
+
+        D_max = (U * x) / (U * x + k * (1 - U))
+        D_max_floor = math.floor(D_max * 100) / 100.0
+
+        domain_knowledge_ignorance_tuned = min(self.domain_knowledge_ignorance, D_max_floor)
+
+        return max(0.0, domain_knowledge_ignorance_tuned)
+
 
 class NormalizationAxiom(Axiom):
     """
@@ -564,7 +666,7 @@ class NormalizationAxiom(Axiom):
         """
         :param predicate: Predicate to normalize
         """
-        super().__init__("postprocessing", group)
+        super().__init__("postprocessing")
         self.predicate = predicate
 
     def reason(self, df_triples: pd.DataFrame, df_classes: pd.DataFrame) -> pd.DataFrame:
@@ -591,7 +693,7 @@ class InverseAxiom(Axiom):
         :param antecedent: Antecedent predicate
         :param inverse: Inverse predicate
         """
-        super().__init__('rule_based_reasoning', group)
+        super().__init__('rule_based_reasoning')
         self.antecedent = antecedent
         self.inverse = inverse
 
@@ -611,7 +713,7 @@ class ChainRuleAxiom(Axiom):
     Implements a modified version of the chain rule axiom from the Academic Meta Tool.
     """
     def __init__(self, antecedent1: str, antecedent2: str, consequent: str, reasoning_logic: Literal['product', 'goedel', 'lukasiewicz'], sum_values: bool = False, class_1: str = None, class_2: str = None,
-                 class_3: str = None, input_threshold: float = None, output_threshold: float = None, group: str = "Undefined"):
+                 class_3: str = None, input_threshold: float = None, output_threshold: float = None):
         """
 
         :param antecedent1: First antecedent predicate: A antecedent1 B
@@ -625,7 +727,7 @@ class ChainRuleAxiom(Axiom):
         :param input_threshold: Optional input threshold for weights
         :param output_threshold: Optional output threshold for weights
         """
-        super().__init__('rule_based_reasoning', group)
+        super().__init__('rule_based_reasoning')
         self.antecedent1 = antecedent1
         self.antecedent2 = antecedent2
         self.consequent = consequent
@@ -713,14 +815,14 @@ class DisjointAxiom(Axiom):
     """
     Axiom to add a constraint that disallows two predicate to have the same subject and object.
     """
-    def __init__(self, predicate1: str, predicate2: str, throw_exception: bool = True, keep_predicate1: bool = True, group: str = "Undefined"):
+    def __init__(self, predicate1: str, predicate2: str, throw_exception: bool = True, keep_predicate1: bool = True):
         """
         :param predicate1: First predicate
         :param predicate2: Second predicate
         :param throw_exception: Throw exception or just remove one of the triples?
         :param keep_predicate1: Keep predicate1 or predicate2?
         """
-        super().__init__("rule_based_reasoning", group)
+        super().__init__("rule_based_reasoning")
         self.predicate1 = predicate1
         self.predicate2 = predicate2
         self.throw_exception = throw_exception
@@ -756,13 +858,13 @@ class SelfDisjointAxiom(Axiom):
     """
     Constraint axiom to disallow self-referencing for a given predicate
     """
-    def __init__(self, predicate: str, throw_exception: bool = True, group: str = "Undefined"):
+    def __init__(self, predicate: str, throw_exception: bool = True):
         """
 
         :param predicate: Predicate to disallow self-referencing for
         :param throw_exception: Throw exception or just remove the triples?
         """
-        super().__init__("rule_based_reasoning", group)
+        super().__init__("rule_based_reasoning")
         self.predicate = predicate
         self.throw_exception = throw_exception
 
