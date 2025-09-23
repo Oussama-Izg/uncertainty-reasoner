@@ -422,7 +422,8 @@ class DempsterShaferAxiom(Axiom):
 
 class AFEDempsterShaferAxiom(Axiom):
     """
-    Use-case-specific Dempster-Shafer axiom for AFE data
+    The old version of the use-case-specific Dempster-Shafer axiom
+    for AFE data (before the new enhancements)
     """
     def __init__(self, issuer_predicate: str = 'ex:issuer', issuing_for_predicate: str = 'ex:issuing_for',
                  domain_knowledge_predicate: str = 'ex:domain_knowledge', ignorance_object: str = 'ex:uncertain',
@@ -496,20 +497,26 @@ class AFEDempsterShaferAxiom(Axiom):
 
 class AFEDempsterShaferAxiom_2(Axiom):
     """
-    Use-case-specific Dempster-Shafer axiom for AFE data
+    The new enhanced version of the use-case-specific Dempster-Shafer axiom
+    for AFE data (after the new enhancements)
     """
-    def __init__(self, target_predicate: str = 'nmo:hasIssuer', knowledge_path_predicate: str = 'nmo:hasPortait',
-                 domain_knowledge_predicate: str = 'ex:hasPossibleIssuers', ignorance_object: str = 'ex:uncertain',
-                 target_ignorance: float = 0.2, domain_knowledge_ignorance: float = 0.2, group: str = "Undefined",
+    def __init__(self, target_predicate: str = 'nmo:hasIssuer',
+                 knowledge_path_predicate: str = 'nmo:hasPortait',
+                 domain_knowledge_predicate: str = 'ex:hasPossibleIssuers',
+                 ignorance_object: str = 'ex:uncertain',
+                 target_ignorance: float = 0.2,
+                 domain_knowledge_ignorance: float = 0.2,
+                 group: str = "Undefined",
                  auto_tune_domain_ignorance: bool = False):
         """
-        :param target_predicate: Issuer predicate
-        :param knowledge_path_predicate: Issuing for predicate
+        :param target_predicate: Target predicate
+        :param knowledge_path_predicate: Predicate that specifies which domain knowledge should be used
         :param domain_knowledge_predicate: Domain knowledge predicate
-        :param ignorance_object: Object that increases ignorance for the mass function
-        :param ignorance: Default ignorance
-        :param domain_knowledge_ignorance: Default ignorance for the domain knowledge
-        :param auto_tune_domain_ignorance: Flag to auto tune the domain knowledge ignorance to prioritize the domain knowledge suggestion
+        :param ignorance_object: Ignorance object that increases the ignorance mass in the appropriate mass function
+        :param target_ignorance: Default ignorance mass in the user mass function
+        :param domain_knowledge_ignorance: Default ignorance mass in the domain knowledge mass functions
+        :param group: Name of the Group to which the instance belongs to
+        :param auto_tune_domain_ignorance: Flag to auto-tune the default domain knowledge ignorance mass to prioritize the domain knowledge suggestion
         """
         super().__init__("preprocessing")
         self.target_predicate = target_predicate

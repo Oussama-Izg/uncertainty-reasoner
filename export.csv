@@ -3,10 +3,10 @@ ex:coin_36911,nmo:hasIssuer,ex:Tetricus_I,1.0,,before
 ex:coin_36911,nmo:hasIssuer,ex:Quintillus,1.0,,before
 ex:coin_36911,nmo:hasPortrait,ex:Divus_Claudius_II,1.0,,before
 ex:coin_36911,nmo:hasPortrait,ex:uncertain,1.0,,before
+ex:coin_36911,nmo:hasIssuer,ex:uncertain,0.154,,
+ex:coin_36911,nmo:hasIssuer,ex:Claudius_II,0.231,,
+ex:coin_36911,nmo:hasIssuer,ex:Tetricus_I,0.308,,
+ex:coin_36911,nmo:hasIssuer,ex:Quintillus,0.308,,
 ex:coin_36911,nmo:hasPortrait,ex:uncertain,0.154,,
 ex:coin_36911,nmo:hasPortrait,ex:Tetricus_II,0.615,,
 ex:coin_36911,nmo:hasPortrait,ex:Divus_Claudius_II,0.231,,
-ex:coin_36911,nmo:hasIssuer,ex:uncertain,0.081,,
-ex:coin_36911,nmo:hasIssuer,ex:Claudius_II,0.148,,
-ex:coin_36911,nmo:hasIssuer,ex:Tetricus_I,0.608,,
-ex:coin_36911,nmo:hasIssuer,ex:Quintillus,0.163,,

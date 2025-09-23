@@ -101,7 +101,7 @@ def run_use_cases(root_folder_name):
                     conn.upload_df(df)
 
                     # upload the data from the triple store and reason upon it
-                    reasoner = Reasoner.Reasoner(axioms3)
+                    reasoner = Reasoner.Reasoner(axioms1)
                     reasoner.load_data_from_endpoint(conn)
                     reasoner.reason()
 

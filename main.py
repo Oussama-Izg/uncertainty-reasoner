@@ -24,11 +24,7 @@ conn = SparqlConnector.ReificationSparqlConnector(QUERY_ENDPOINT, UPDATE_ENDPOIN
 axioms = [
         Reasoner.CertaintyAssignmentAxiom("nmo:hasIssuer"),
         Reasoner.CertaintyAssignmentAxiom("nmo:hasPortrait"),
-        Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers"),
-        Reasoner.AFEDempsterShaferAxiom('nmo:hasIssuer',
-                                          'nmo:hasPortrait',
-                                        'ex:hasPossibleIssuers',
-                                        'ex:uncertain')
+        Reasoner.CertaintyAssignmentAxiom("ex:hasPossibleIssuers")
     ]
 
 # Instantiate the Reasoner
